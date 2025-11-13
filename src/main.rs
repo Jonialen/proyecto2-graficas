@@ -18,16 +18,15 @@ use material::{Material, vector3_to_color};
 use cube::Cube;
 
 const ORIGIN_BIAS: f32 = 1e-4;
-const MAX_DEPTH: u32 = 1; // Reducido para mejor rendimiento
+const MAX_DEPTH: u32 = 2;
 
 fn sky_color(dir: Vector3, is_nether: bool) -> Vector3 {
     let d = dir.normalized();
     let t = (d.y + 1.0) * 0.5;
     
     if is_nether {
-        // Cielo del Nether - tonos rojos oscuros
-        let dark_red = Vector3::new(0.2, 0.02, 0.02);
-        let deep_crimson = Vector3::new(0.35, 0.05, 0.05);
+        let dark_red = Vector3::new(0.15, 0.01, 0.01);
+        let deep_crimson = Vector3::new(0.25, 0.03, 0.03);
         
         if t < 0.5 {
             dark_red
@@ -36,8 +35,7 @@ fn sky_color(dir: Vector3, is_nether: bool) -> Vector3 {
             dark_red * (1.0 - k) + deep_crimson * k
         }
     } else {
-        // Cielo del Overworld - verde césped y azul
-        let grass_green = Vector3::new(0.3, 0.6, 0.3);
+        let grass_green = Vector3::new(0.4, 0.7, 0.4);
         let sky_blue = Vector3::new(0.5, 0.7, 1.0);
         
         if t < 0.45 {
@@ -75,10 +73,10 @@ fn cast_shadow(
     let light_distance = (light.position - intersect.point).length();
     let shadow_ray_origin = offset_origin(intersect, &light_dir);
 
-    for object in objects {
+    for object in objects.iter().take(30) {
         let shadow_intersect = object.ray_intersect(&shadow_ray_origin, &light_dir);
         if shadow_intersect.is_intersecting && shadow_intersect.distance < light_distance {
-            return 0.8;
+            return 0.6;
         }
     }
     0.0
@@ -115,30 +113,30 @@ pub fn cast_ray(
     let view_dir = (*ray_origin - intersect.point).normalized();
     let mut final_color = Vector3::zero();
 
-    // Luz ambiental diferente según la dimensión
     let ambient = if intersect.point.y < 0.0 {
-        Vector3::new(0.08, 0.02, 0.02) // Nether
+        Vector3::new(0.05, 0.01, 0.01)
     } else {
-        Vector3::new(0.15, 0.15, 0.18) // Overworld
+        Vector3::new(0.12, 0.12, 0.15)
     };
     final_color = final_color + intersect.material.diffuse * ambient;
 
-    // Emisión del material
     if intersect.material.emissive.length() > 0.0 {
-        final_color = final_color + intersect.material.emissive;
+        final_color = final_color + intersect.material.emissive * 0.5;
     }
 
-    // Iluminación por cada luz
     for light in lights {
         let light_dir = (light.position - intersect.point).normalized();
         let diffuse_dot = intersect.normal.dot(light_dir);
         
         if diffuse_dot <= 0.0 {
-            continue; // La luz está detrás de la superficie
+            continue;
         }
 
+        let distance = (light.position - intersect.point).length();
+        let attenuation = 1.0 / (1.0 + 0.05 * distance + 0.01 * distance * distance);
+
         let shadow_intensity = cast_shadow(&intersect, light, objects);
-        let light_intensity = light.intensity * (1.0 - shadow_intensity);
+        let light_intensity = light.intensity * (1.0 - shadow_intensity) * attenuation;
 
         let light_color_v3 = Vector3::new(
             light.color.r as f32 / 255.0,
@@ -160,7 +158,6 @@ pub fn cast_ray(
                                   + specular * intersect.material.albedo[1];
     }
 
-    // Reflexión
     let reflectivity = intersect.material.reflectivity;
     if reflectivity > 0.05 && depth < MAX_DEPTH {
         let reflect_dir = reflect(ray_direction, &intersect.normal).normalized();
@@ -184,7 +181,6 @@ pub fn render(
     let fov = PI / 3.0;
     let perspective_scale = (fov * 0.5).tan();
 
-    // Renderizado paralelo por filas
     let pixels: Vec<Color> = (0..height)
         .into_par_iter()
         .flat_map(|y| {
@@ -208,7 +204,6 @@ pub fn render(
         })
         .collect();
 
-    // Escribir pixels al framebuffer
     for (i, color) in pixels.iter().enumerate() {
         let x = (i % width) as u32;
         let y = (i / width) as u32;
@@ -217,26 +212,26 @@ pub fn render(
     }
 }
 
-fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+fn create_island_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
     let mut objects: Vec<Arc<dyn RayIntersect + Send + Sync>> = Vec::new();
 
     // ========== MATERIALES ==========
     
-    // Overworld
+    // Overworld - colores más saturados y distintos
     let grass = Material::new(
-        Vector3::new(0.3, 0.7, 0.3),
+        Vector3::new(0.2, 0.8, 0.2),  // Verde brillante
         10.0,
-        [0.8, 0.1],
+        [0.9, 0.1],
         0.0,
         0.0,
         Vector3::zero(),
         None,
     );
 
-    let stone = Material::new(
-        Vector3::new(0.5, 0.5, 0.5),
-        15.0,
-        [0.7, 0.15],
+    let dirt = Material::new(
+        Vector3::new(0.6, 0.4, 0.2),  // Café tierra
+        5.0,
+        [0.85, 0.05],
         0.0,
         0.0,
         Vector3::zero(),
@@ -244,7 +239,7 @@ fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
     );
 
     let wood = Material::new(
-        Vector3::new(0.55, 0.35, 0.2),
+        Vector3::new(0.4, 0.25, 0.1),  // Café madera oscura
         8.0,
         [0.75, 0.08],
         0.0,
@@ -254,7 +249,7 @@ fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
     );
 
     let leaves = Material::new(
-        Vector3::new(0.2, 0.6, 0.2),
+        Vector3::new(0.1, 0.5, 0.1),  // Verde oscuro hojas
         5.0,
         [0.85, 0.05],
         0.0,
@@ -264,18 +259,28 @@ fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
     );
 
     let water = Material::new(
-        Vector3::new(0.2, 0.4, 0.8),
-        80.0,
-        [0.3, 0.5],
+        Vector3::new(0.1, 0.3, 0.7),  // Azul profundo
+        100.0,
+        [0.2, 0.6],
         0.0,
-        0.4,
+        0.5,  // Más reflectante
         Vector3::zero(),
         None,
     );
 
-    // Nether
+    let torch = Material::new(
+        Vector3::new(1.0, 0.6, 0.0),  // Naranja brillante
+        40.0,
+        [0.3, 0.2],
+        0.0,
+        0.0,
+        Vector3::new(1.2, 0.6, 0.1),
+        None,
+    );
+
+    // Nether - colores más dramáticos
     let netherrack = Material::new(
-        Vector3::new(0.45, 0.15, 0.15),
+        Vector3::new(0.6, 0.1, 0.1),  // Rojo netherrack
         10.0,
         [0.8, 0.1],
         0.0,
@@ -284,20 +289,10 @@ fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
         None,
     );
 
-    let dark_wood = Material::new(
-        Vector3::new(0.25, 0.15, 0.1),
-        8.0,
-        [0.7, 0.08],
-        0.0,
-        0.0,
-        Vector3::zero(),
-        None,
-    );
-
-    let nether_leaves = Material::new(
-        Vector3::new(0.6, 0.1, 0.1),
-        5.0,
-        [0.8, 0.05],
+    let nether_brick = Material::new(
+        Vector3::new(0.2, 0.05, 0.05),  // Muy oscuro
+        15.0,
+        [0.7, 0.15],
         0.0,
         0.0,
         Vector3::zero(),
@@ -305,117 +300,143 @@ fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
     );
 
     let lava = Material::new(
-        Vector3::new(1.0, 0.4, 0.0),
+        Vector3::new(1.0, 0.3, 0.0),  // Naranja lava
         20.0,
         [0.6, 0.3],
         0.0,
         0.0,
-        Vector3::new(1.2, 0.5, 0.1),
+        Vector3::new(1.0, 0.4, 0.05),
         None,
     );
 
-    // Emisivos
-    let torch = Material::new(
-        Vector3::new(0.9, 0.5, 0.1),
-        40.0,
-        [0.3, 0.2],
+    let soul_sand = Material::new(
+        Vector3::new(0.3, 0.2, 0.15),  // Café soul sand
+        8.0,
+        [0.75, 0.1],
         0.0,
         0.0,
-        Vector3::new(2.5, 1.2, 0.3),
-        None,
-    );
-
-    // Plano espejo en Y=0
-    let mirror = Material::new(
-        Vector3::new(0.85, 0.85, 0.95),
-        120.0,
-        [0.1, 0.5],
-        0.0,
-        0.75,
         Vector3::zero(),
         None,
     );
 
-    // ========== OVERWORLD (Y > 0) - 13x13 ==========
+    // Plano espejo
+    let mirror = Material::new(
+        Vector3::new(0.9, 0.9, 1.0),
+        120.0,
+        [0.05, 0.6],
+        0.0,
+        0.85,
+        Vector3::zero(),
+        None,
+    );
+
+    // ========== ISLA FLOTANTE (OVERWORLD) Y > 0 ==========
     
-    // Piso de césped compacto (sin espacios)
-    for x in -6..=6 {
-        for z in -6..=6 {
+    // Base de la isla (forma circular 7x7)
+    let island_blocks = vec![
+        // Centro (y = 1-2)
+        (0, 0), (1, 0), (-1, 0), (0, 1), (0, -1),
+        (1, 1), (1, -1), (-1, 1), (-1, -1),
+        (2, 0), (-2, 0), (0, 2), (0, -2),
+        (2, 1), (2, -1), (-2, 1), (-2, -1),
+        (1, 2), (1, -2), (-1, 2), (-1, -2),
+        // Bordes
+        (3, 0), (-3, 0), (0, 3), (0, -3),
+        (2, 2), (2, -2), (-2, 2), (-2, -2),
+    ];
+
+    // Capa de césped (y = 2) - EXCEPTO donde irá el agua
+    for (x, z) in &island_blocks {
+        // Saltar posiciones del laguito (centro de la isla)
+        if !(*x >= -1 && *x <= 0 && *z >= -1 && *z <= 0) {
             objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, 1.0, z as f32),
+                Vector3::new(*x as f32, 2.0, *z as f32),
                 1.0,
                 grass.clone(),
             )));
         }
     }
 
-    // Paredes de piedra
-    for y in 2..=5 {
-        for x in -6..=6 {
-            objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, y as f32, -6.0),
-                1.0,
-                stone.clone(),
-            )));
-        }
-        
+    // Capa de tierra (y = 1)
+    for (x, z) in &island_blocks {
         objects.push(Arc::new(Cube::new(
-            Vector3::new(-6.0, y as f32, 0.0),
+            Vector3::new(*x as f32, 1.0, *z as f32),
             1.0,
-            stone.clone(),
-        )));
-        objects.push(Arc::new(Cube::new(
-            Vector3::new(6.0, y as f32, 0.0),
-            1.0,
-            stone.clone(),
+            dirt.clone(),
         )));
     }
 
-    // Árbol del Overworld (izquierda) - Tronco
-    for y in 2..=5 {
+    // LAGUITO INTERIOR (2x2 en el centro, nivel más bajo)
+    // Fondo de tierra visible
+    for x in -1..=0 {
+        for z in -1..=0 {
+            objects.push(Arc::new(Cube::new(
+                Vector3::new(x as f32, 1.5, z as f32),
+                1.0,
+                dirt.clone(),
+            )));
+        }
+    }
+    
+    // Agua encima (nivel 1.8 para que se vea el hoyo)
+    for x in -1..=0 {
+        for z in -1..=0 {
+            objects.push(Arc::new(Cube::new(
+                Vector3::new(x as f32, 1.8, z as f32),
+                1.0,
+                water.clone(),
+            )));
+        }
+    }
+    // Tronco
+    for y in 3..=5 {
         objects.push(Arc::new(Cube::new(
-            Vector3::new(-3.0, y as f32, -3.0),
+            Vector3::new(-2.0, y as f32, 0.0),
             1.0,
             wood.clone(),
         )));
     }
-    
-    // Copa del árbol (hojas)
-    for x in -4..=-2 {
-        for z in -4..=-2 {
-            for y in 5..=7 {
-                if !(x == -3 && z == -3 && y == 5) {
-                    objects.push(Arc::new(Cube::new(
-                        Vector3::new(x as f32, y as f32, z as f32),
-                        1.0,
-                        leaves.clone(),
-                    )));
-                }
-            }
-        }
+
+    // Copa del árbol (hojas en forma de cruz)
+    let leaf_positions = vec![
+        // Nivel 1 (y=5)
+        (-3, 5, 0), (-2, 5, 1), (-2, 5, -1), (-1, 5, 0),
+        // Nivel 2 (y=6)
+        (-3, 6, 0), (-2, 6, 0), (-1, 6, 0),
+        (-2, 6, 1), (-2, 6, -1),
+        // Top (y=7)
+        (-2, 7, 0),
+    ];
+
+    for (x, y, z) in leaf_positions {
+        objects.push(Arc::new(Cube::new(
+            Vector3::new(x as f32, y as f32, z as f32),
+            1.0,
+            leaves.clone(),
+        )));
     }
 
-    // Lago de agua (derecha)
-    for x in 2..=4 {
-        for z in -4..=-2 {
+    // LAGUITO (2x2 en posición: 1, -1)
+    for x in 1..=2 {
+        for z in -2..=-1 {
             objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, 1.0, z as f32),
+                Vector3::new(x as f32, 2.0, z as f32),
                 1.0,
                 water.clone(),
             )));
         }
     }
 
-    // Antorcha del Overworld
+    // ANTORCHA (al lado del árbol)
     objects.push(Arc::new(Cube::new(
-        Vector3::new(0.0, 2.0, -4.0),
+        Vector3::new(-2.0, 3.0, 2.0),
         0.3,
         torch.clone(),
     )));
 
-    // ========== PLANO ESPEJO (Y=0) ==========
-    for x in -7..=7 {
-        for z in -7..=7 {
+    // ========== PLANO ESPEJO (Y = 0) ==========
+    for x in -5..=5 {
+        for z in -5..=5 {
             objects.push(Arc::new(Cube::new(
                 Vector3::new(x as f32, 0.0, z as f32),
                 1.0,
@@ -424,158 +445,166 @@ fn create_mirror_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
         }
     }
 
-    // ========== NETHER (Y < 0) - REFLEJO ==========
+    // ========== NETHER REFLEJADO (Y < 0) ==========
     
-    // Techo de netherrack
-    for x in -6..=6 {
-        for z in -6..=6 {
+    // "Isla" del Nether (techo netherrack) - EXCEPTO donde irá la lava
+    for (x, z) in &island_blocks {
+        if !(*x >= -1 && *x <= 0 && *z >= -1 && *z <= 0) {
             objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, -1.0, z as f32),
+                Vector3::new(*x as f32, -2.0, *z as f32),
                 1.0,
                 netherrack.clone(),
             )));
         }
+        objects.push(Arc::new(Cube::new(
+            Vector3::new(*x as f32, -1.0, *z as f32),
+            1.0,
+            nether_brick.clone(),
+        )));
     }
 
-    // Paredes oscuras
-    for y in -5..=-2 {
-        for x in -6..=6 {
+    // Pozo de LAVA (reflejo del agua)
+    for x in -1..=0 {
+        for z in -1..=0 {
             objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, y as f32, -6.0),
+                Vector3::new(x as f32, -1.5, z as f32),
                 1.0,
-                netherrack.clone(),
+                nether_brick.clone(),
             )));
         }
-        
-        objects.push(Arc::new(Cube::new(
-            Vector3::new(-6.0, y as f32, 0.0),
-            1.0,
-            netherrack.clone(),
-        )));
-        objects.push(Arc::new(Cube::new(
-            Vector3::new(6.0, y as f32, 0.0),
-            1.0,
-            netherrack.clone(),
-        )));
-    }
-
-    // Árbol del Nether (izquierda) - Tronco oscuro
-    for y in -5..=-2 {
-        objects.push(Arc::new(Cube::new(
-            Vector3::new(-3.0, y as f32, -3.0),
-            1.0,
-            dark_wood.clone(),
-        )));
     }
     
-    // Copa del árbol del Nether (hojas rojas)
-    for x in -4..=-2 {
-        for z in -4..=-2 {
-            for y in -7..=-5 {
-                if !(x == -3 && z == -3 && y == -5) {
-                    objects.push(Arc::new(Cube::new(
-                        Vector3::new(x as f32, y as f32, z as f32),
-                        1.0,
-                        nether_leaves.clone(),
-                    )));
-                }
-            }
-        }
-    }
-
-    // Lago de lava (derecha)
-    for x in 2..=4 {
-        for z in -4..=-2 {
+    for x in -1..=0 {
+        for z in -1..=0 {
             objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, -1.0, z as f32),
+                Vector3::new(x as f32, -1.8, z as f32),
                 1.0,
                 lava.clone(),
             )));
         }
     }
 
-    // Antorcha del Nether
+    // "Árbol" del Nether (columna de netherrack)
+    for y in -5..=-3 {
+        objects.push(Arc::new(Cube::new(
+            Vector3::new(-2.0, y as f32, 0.0),
+            1.0,
+            nether_brick.clone(),
+        )));
+    }
+
+    // "Hojas" del Nether (soul sand)
+    let nether_leaf_pos = vec![
+        (-3, -5, 0), (-2, -5, 1), (-2, -5, -1), (-1, -5, 0),
+        (-3, -6, 0), (-2, -6, 0), (-1, -6, 0),
+        (-2, -6, 1), (-2, -6, -1),
+        (-2, -7, 0),
+    ];
+
+    for (x, y, z) in nether_leaf_pos {
+        objects.push(Arc::new(Cube::new(
+            Vector3::new(x as f32, y as f32, z as f32),
+            1.0,
+            soul_sand.clone(),
+        )));
+    }
+
+    // Lago de LAVA (mismo lugar que el agua)
+    for x in 1..=2 {
+        for z in -2..=-1 {
+            objects.push(Arc::new(Cube::new(
+                Vector3::new(x as f32, -2.0, z as f32),
+                1.0,
+                lava.clone(),
+            )));
+        }
+    }
+
+    // "Antorcha" del Nether (bloque emisivo)
     objects.push(Arc::new(Cube::new(
-        Vector3::new(0.0, -2.0, -4.0),
-        0.3,
-        torch.clone(),
+        Vector3::new(1.0, -3.0, 0.0),
+        0.4,
+        lava.clone(),
     )));
 
     // ========== LUCES ==========
     let lights = vec![
-        // Luz del sol (Overworld - general)
+        // Luz solar (Overworld)
         Light::new(
-            Vector3::new(0.0, 15.0, 0.0),
+            Vector3::new(5.0, 15.0, 5.0),
             Color::new(255, 250, 240, 255),
-            5.0,
+            3.0,
         ),
         
-        // Antorcha Overworld
+        // Antorcha del Overworld
         Light::new(
-            Vector3::new(0.0, 2.5, -4.0),
+            Vector3::new(1.0, 3.5, 0.0),
             Color::new(255, 180, 80, 255),
-            4.0,
+            2.5,
         ),
         
-        // Lagos de lava (múltiples luces)
+        // Lago de lava (Nether)
         Light::new(
-            Vector3::new(2.5, -0.5, -3.0),
-            Color::new(255, 120, 30, 255),
-            5.0,
-        ),
-        Light::new(
-            Vector3::new(3.5, -0.5, -3.0),
+            Vector3::new(-0.5, -1.5, -0.5),
             Color::new(255, 100, 20, 255),
-            4.5,
+            3.5,
         ),
         
-        // Antorcha Nether
+        // "Antorcha" del Nether
         Light::new(
-            Vector3::new(0.0, -2.0, -4.0),
-            Color::new(255, 140, 50, 255),
-            4.0,
+            Vector3::new(1.0, -3.0, 0.0),
+            Color::new(255, 120, 30, 255),
+            2.0,
+        ),
+        
+        // Luz ambiental del Nether
+        Light::new(
+            Vector3::new(0.0, -10.0, 0.0),
+            Color::new(200, 50, 30, 255),
+            1.5,
         ),
     ];
 
+    println!("🏝️  Objetos en la isla: {}", objects.len());
     (objects, lights)
 }
 
 fn main() {
-    let window_width = 1000;
-    let window_height = 700;
+    let window_width = 800;
+    let window_height = 600;
 
     let (mut window, thread) = raylib::init()
         .size(window_width, window_height)
-        .title("Mirror Worlds - Overworld & Nether")
+        .title("🏝️ Isla Flotante - Overworld & Nether Reflejado")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
 
     let mut framebuffer = Framebuffer::new(window_width as u32, window_height as u32);
 
-    let (objects, lights) = create_mirror_scene();
+    let (objects, lights) = create_island_scene();
 
     let mut camera = Camera::new(
-        Vector3::new(0.0, 2.0, 12.0),
-        Vector3::new(0.0, 0.0, -2.0),
+        Vector3::new(8.0, 4.0, 8.0),
+        Vector3::new(0.0, 0.0, 0.0),
         Vector3::new(0.0, 1.0, 0.0),
     );
 
-    let rotation_speed = PI / 80.0;
-    let zoom_speed = 0.25;
+    let rotation_speed = PI / 60.0;
+    let zoom_speed = 0.3;
 
-    println!("Renderizando escena inicial (esto puede tomar unos segundos)...");
+    println!("🎨 Renderizando isla flotante...");
     let start = std::time::Instant::now();
     render(&mut framebuffer, &objects, &camera, &lights);
-    println!("Renderizado completo en {:.2}s", start.elapsed().as_secs_f32());
+    println!("✨ Renderizado en {:.2}s", start.elapsed().as_secs_f32());
 
-    window.set_target_fps(60);
+    window.set_target_fps(30);
 
-    println!("\nControles:");
+    println!("\n🎮 Controles:");
     println!("  ← → : Rotar horizontalmente");
     println!("  ↑ ↓ : Rotar verticalmente");
     println!("  W S : Zoom in/out");
     println!("  ESC : Salir");
-    println!("\nMira el espejo en Y=0 que refleja ambos mundos!");
+    println!("\n✨ Observa el espejo en Y=0 que refleja el Nether!");
 
     while !window.window_should_close() {
         let mut needs_render = false;
@@ -609,9 +638,7 @@ fn main() {
             let start = std::time::Instant::now();
             render(&mut framebuffer, &objects, &camera, &lights);
             let elapsed = start.elapsed().as_secs_f32();
-            if elapsed > 0.1 {
-                println!("Frame renderizado en {:.3}s ({:.1} FPS)", elapsed, 1.0 / elapsed);
-            }
+            println!("⚡ Frame: {:.3}s ({:.1} FPS)", elapsed, 1.0 / elapsed);
         }
 
         framebuffer.swap_buffers(&mut window, &thread);
