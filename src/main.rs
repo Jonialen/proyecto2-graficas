@@ -389,10 +389,10 @@ fn main() {
     println!("║  ↑ ↓       : Rotar verticalmente      ║");
     println!("║  W S       : Zoom in/out              ║");
     println!("║  R         : Reset cámara             ║");
-    println!("║  T         : Toggle day/night         ║");
     println!("║  P         : Pausar ciclo día/noche   ║");
     println!("║  [         : Adelantar tiempo         ║");
     println!("║  ]         : Retroceder tiempo        ║");
+    println!("║  E         : Exportar texturas        ║");
     println!("║  ESC       : Salir                    ║");
     println!("╚════════════════════════════════════════╝\n");
 
@@ -510,6 +510,13 @@ fn main() {
             );
             println!("📷 Cámara reseteada");
             needs_render = true;
+        }
+
+        if window.is_key_pressed(KeyboardKey::KEY_E) {
+            println!("📦 Exportando texturas...");
+            TEXTURE_MANAGER.lock().unwrap()
+                .export_all_textures("assets/textures_exported");
+            println!("✅ Texturas exportadas a assets/textures_exported/");
         }
 
         if !paused {

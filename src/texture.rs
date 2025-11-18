@@ -30,9 +30,15 @@ impl TextureManager {
             time: 0.0,
         };
         
+        // 1. Generar texturas procedurales en memoria
         manager.load_placeholder_textures();
         manager.load_animated_textures();
+        
+        // 2. Intentar cargar desde disco (reemplaza las procedurales si existen)
         manager.load_textures_from_directory("assets/textures");
+        
+        // ✅ 3. Exportar las que faltan (NUEVO)
+        manager.export_missing_textures("assets/textures");
         
         manager
     }
@@ -40,15 +46,144 @@ impl TextureManager {
     pub fn update(&mut self, delta_time: f32) {
         self.time += delta_time;
     }
+    
+    pub fn export_missing_textures(&self, dir_path: &str) {
+        // Crear el directorio si no existe
+        if let Err(e) = std::fs::create_dir_all(dir_path) {
+            println!("⚠️  No se pudo crear directorio {}: {}", dir_path, e);
+            return;
+        }
+
+        let mut exported_count = 0;
+        let mut skipped_count = 0;
+
+        // Exportar texturas estáticas
+        for (name, texture_data) in &self.textures {
+            let file_path = format!("{}/{}.png", dir_path, name);
+            
+            if Path::new(&file_path).exists() {
+                skipped_count += 1;
+                continue;
+            }
+
+            if self.export_texture_to_file(name, &file_path, texture_data) {
+                println!("💾 Textura exportada: {}", file_path);
+                exported_count += 1;
+            }
+        }
+
+        // Exportar frames de texturas animadas
+        for (name, animated) in &self.animated_textures {
+            for (frame_idx, frame_data) in animated.frames.iter().enumerate() {
+                let file_path = format!("{}/{}_{}.png", dir_path, name, frame_idx);
+                
+                if Path::new(&file_path).exists() {
+                    skipped_count += 1;
+                    continue;
+                }
+
+                if self.export_texture_to_file(
+                    &format!("{}_{}", name, frame_idx),
+                    &file_path,
+                    frame_data
+                ) {
+                    println!("💾 Frame de animación exportado: {}", file_path);
+                    exported_count += 1;
+                }
+            }
+        }
+
+        if exported_count > 0 {
+            println!("✅ {} texturas exportadas a {}", exported_count, dir_path);
+        }
+        if skipped_count > 0 {
+            println!("⏭️  {} texturas ya existían (no sobreescritas)", skipped_count);
+        }
+    }
+
+    /// Exporta una textura individual a un archivo PNG
+    fn export_texture_to_file(
+        &self,
+        _name: &str,
+        file_path: &str,
+        texture_data: &TextureData
+    ) -> bool {
+        match image::RgbaImage::from_raw(
+            texture_data.width,
+            texture_data.height,
+            texture_data.data.clone()
+        ) {
+            Some(img) => {
+                match img.save(file_path) {
+                    Ok(_) => true,
+                    Err(e) => {
+                        println!("❌ Error guardando {}: {}", file_path, e);
+                        false
+                    }
+                }
+            }
+            _none => {
+                println!("❌ Error creando imagen para {}", file_path);
+                false
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn export_texture(&self, name: &str, output_path: &str) -> bool {
+        if let Some(texture_data) = self.textures.get(name) {
+            return self.export_texture_to_file(name, output_path, texture_data);
+        }
+
+        println!("⚠️  Textura '{}' no encontrada", name);
+        false
+    }
+
+    #[allow(dead_code)]
+    pub fn export_all_textures(&self, dir_path: &str) -> usize {
+        if let Err(e) = std::fs::create_dir_all(dir_path) {
+            println!("❌ No se pudo crear directorio {}: {}", dir_path, e);
+            return 0;
+        }
+
+        let mut count = 0;
+
+        // Exportar texturas estáticas
+        for (name, texture_data) in &self.textures {
+            let file_path = format!("{}/{}.png", dir_path, name);
+            if self.export_texture_to_file(name, &file_path, texture_data) {
+                count += 1;
+            }
+        }
+
+        // Exportar frames animados
+        for (name, animated) in &self.animated_textures {
+            for (frame_idx, frame_data) in animated.frames.iter().enumerate() {
+                let file_path = format!("{}/{}_{}.png", dir_path, name, frame_idx);
+                if self.export_texture_to_file(
+                    &format!("{}_{}", name, frame_idx),
+                    &file_path,
+                    frame_data
+                ) {
+                    count += 1;
+                }
+            }
+        }
+
+        println!("✅ {} texturas exportadas (todas) a {}", count, dir_path);
+        count
+    }
 
     pub fn load_textures_from_directory(&mut self, dir_path: &str) {
         let path = Path::new(dir_path);
         
         if !path.exists() {
-            println!("⚠️  Directorio de texturas no encontrado: {}", dir_path);
-            println!("   Usando texturas procedurales por defecto");
+            println!("📂 Directorio de texturas no existe aún: {}", dir_path);
+            println!("   Se crearán texturas procedurales");
             return;
         }
+
+        let mut loaded_count = 0;
 
         if let Ok(entries) = std::fs::read_dir(path) {
             for entry in entries.flatten() {
@@ -61,13 +196,71 @@ impl TextureManager {
                         if let Some(file_name) = file_path.file_stem() {
                             let texture_name = file_name.to_string_lossy().to_string();
                             
-                            if self.load_texture_from_file(&texture_name, &file_path.to_string_lossy()) {
-                                println!("✅ Textura cargada: {} desde {}", texture_name, file_path.display());
+                            // Verificar si es un frame de animación
+                            if let Some(base_name) = texture_name.strip_suffix("_0")
+                                .or_else(|| texture_name.strip_suffix("_1"))
+                                .or_else(|| texture_name.strip_suffix("_2"))
+                                .or_else(|| texture_name.strip_suffix("_3"))
+                                .or_else(|| texture_name.strip_suffix("_4"))
+                                .or_else(|| texture_name.strip_suffix("_5"))
+                            {
+                                // Es un frame de animación, cargar todos los frames
+                                self.load_animated_texture_from_files(base_name, dir_path);
+                            } else if self.load_texture_from_file(&texture_name, &file_path.to_string_lossy()) {
+                                loaded_count += 1;
                             }
                         }
                     }
                 }
             }
+        }
+
+        if loaded_count > 0 {
+            println!("✅ {} texturas cargadas desde {}", loaded_count, dir_path);
+        }
+    }
+
+    /// Carga todos los frames de una textura animada desde archivos
+    fn load_animated_texture_from_files(&mut self, base_name: &str, dir_path: &str) -> bool {
+        let mut frames = Vec::new();
+        let mut frame_idx = 0;
+
+        loop {
+            let file_path = format!("{}/{}_{}.png", dir_path, base_name, frame_idx);
+            
+            if !Path::new(&file_path).exists() {
+                break;
+            }
+
+            match self.load_image_data(&file_path) {
+                Ok(texture_data) => {
+                    frames.push(texture_data);
+                    frame_idx += 1;
+                }
+                Err(_) => break,
+            }
+        }
+
+        if !frames.is_empty() {
+            let frame_duration = match base_name {
+                "water" => 0.3,
+                "lava" => 0.2,
+                "portal" => 0.15,
+                _ => 0.25,
+            };
+
+            self.animated_textures.insert(
+                base_name.to_string(),
+                AnimatedTexture {
+                    frames,
+                    frame_duration,
+                },
+            );
+
+            println!("🎬 Textura animada cargada: {} ({} frames)", base_name, frame_idx);
+            true
+        } else {
+            false
         }
     }
 
