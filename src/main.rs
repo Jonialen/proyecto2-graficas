@@ -11,6 +11,7 @@ mod material;
 mod cube;
 mod texture;
 mod mesh;
+mod scene_builder;
 
 use framebuffer::Framebuffer;
 use ray_intersect::{Intersect, RayIntersect};
@@ -20,6 +21,219 @@ use material::{Material, vector3_to_color};
 use cube::Cube;
 use texture::TextureManager;
 use mesh::Mesh;
+use crate::scene_builder::{SceneBuilder, WallDirection};
+
+// === EJEMPLO 1: ESCENA SIMPLE ===
+fn create_simple_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        .add_floor(10, "grass_top")              // Piso de césped 21x21
+        .add_cube(0.0, 1.0, 0.0, 2.0, "stone")  // Cubo de piedra en el centro
+        .add_sun(10.0, 15.0, 10.0, 3.0)         // Sol
+        .build()
+}
+
+// === EJEMPLO 2: CASA CON JARDÍN ===
+fn create_house_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        // Piso estilo tablero
+        .add_checkered_floor(10, "grass_top", "dirt")
+        
+        // Casa principal
+        .add_house(0, 0)
+        
+        // Árboles alrededor
+        .add_tree(-5, -5)
+        .add_tree(-5, 5)
+        .add_tree(8, -5)
+        .add_tree(8, 5)
+        
+        // Iluminación
+        .add_sun(15.0, 20.0, 15.0, 3.5)
+        .build()
+}
+
+// === EJEMPLO 3: CASTILLO ===
+fn create_castle_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        // Piso de piedra
+        .add_floor(20, "stone")
+        
+        // Torres en las esquinas
+        .add_tower(-10, -10, 8, "stone")
+        .add_tower(-10, 10, 8, "stone")
+        .add_tower(10, -10, 8, "stone")
+        .add_tower(10, 10, 8, "stone")
+        
+        // Murallas conectando las torres
+        .add_wall(-10, -10, 21, 5, WallDirection::North, "stone")
+        .add_wall(-10, 10, 21, 5, WallDirection::South, "stone")
+        .add_wall(-10, -10, 21, 5, WallDirection::East, "stone")
+        .add_wall(10, -10, 21, 5, WallDirection::West, "stone")
+        
+        // Torreones dorados en las torres
+        .add_cube(-10.0, 8.0, -10.0, 1.0, "gold")
+        .add_cube(-10.0, 8.0, 10.0, 1.0, "gold")
+        .add_cube(10.0, 8.0, -10.0, 1.0, "gold")
+        .add_cube(10.0, 8.0, 10.0, 1.0, "gold")
+        
+        // Antorchas en las murallas
+        .add_torches(&[
+            (-5.0, 5.0, -10.0),
+            (0.0, 5.0, -10.0),
+            (5.0, 5.0, -10.0),
+            (-10.0, 5.0, -5.0),
+            (-10.0, 5.0, 5.0),
+        ])
+        
+        // Sol y luna (dos luces)
+        .add_sun(20.0, 25.0, 20.0, 4.0)
+        .add_light(-20.0, 15.0, -20.0, Color::new(150, 150, 200, 255), 2.0)
+        
+        .build()
+}
+
+// === EJEMPLO 4: GALERÍA DE MATERIALES ===
+fn create_material_showcase() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let materials = vec![
+        "stone", "wood", "gold", "silver", "glass",
+        "water", "lava", "glowstone", "dirt", "leaves"
+    ];
+    
+    let mut builder = SceneBuilder::new()
+        .add_checkered_floor(10, "grass_top", "dirt");
+    
+    // Crear una fila de cubos con diferentes materiales
+    for (i, material) in materials.iter().enumerate() {
+        let x = (i as f32 - materials.len() as f32 / 2.0) * 2.5;
+        builder = builder.add_cube(x, 1.0, 0.0, 1.5, material);
+    }
+    
+    builder
+        .add_sun(0.0, 20.0, 15.0, 4.0)
+        .add_light(0.0, 5.0, -10.0, Color::new(255, 100, 100, 255), 2.0)
+        .build()
+}
+
+// === EJEMPLO 5: PUEBLO ===
+fn create_village_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        // Terreno
+        .add_floor(25, "grass_top")
+        
+        // Casas distribuidas
+        .add_house(-15, -15)
+        .add_house(-15, 5)
+        .add_house(5, -15)
+        .add_house(5, 5)
+        
+        // Plaza central con fuente
+        .add_cubes(
+            &[
+                (0.0, 0.0, 0.0),
+                (1.0, 0.0, 0.0), (-1.0, 0.0, 0.0),
+                (0.0, 0.0, 1.0), (0.0, 0.0, -1.0),
+            ],
+            1.0,
+            "stone"
+        )
+        .add_cube(0.0, 1.0, 0.0, 0.5, "water")
+        
+        // Árboles decorativos
+        .add_tree(-20, 0)
+        .add_tree(0, -20)
+        .add_tree(20, 0)
+        .add_tree(0, 20)
+        .add_tree(-10, -10)
+        .add_tree(10, 10)
+        
+        // Farolas
+        .add_tower(-5, -5, 3, "stone")
+        .add_torch(-5.0, 3.0, -5.0)
+        .add_tower(5, 5, 3, "stone")
+        .add_torch(5.0, 3.0, 5.0)
+        
+        // Iluminación ambiental
+        .add_sun(30.0, 40.0, 30.0, 4.0)
+        .add_light(-30.0, 20.0, -30.0, Color::new(200, 200, 255, 255), 1.5)
+        
+        .build()
+}
+
+// === EJEMPLO 6: LABERINTO ===
+fn create_maze_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let mut builder = SceneBuilder::new()
+        .add_floor(15, "stone");
+    
+    // Paredes del laberinto (patrón simple)
+    let walls = vec![
+        ((-10, -10), 5, WallDirection::North),
+        ((-10, 0), 8, WallDirection::East),
+        ((0, -5), 10, WallDirection::North),
+        ((5, 0), 6, WallDirection::East),
+    ];
+    
+    for ((x, z), length, direction) in walls {
+        builder = builder.add_wall(x, z, length, 3, direction, "nether_brick");
+    }
+    
+    builder
+        .add_torch(0.0, 1.0, 0.0)
+        .add_sun(20.0, 30.0, 20.0, 3.0)
+        .build()
+}
+
+// === EJEMPLO 7: MODELO OBJ PERSONALIZADO ===
+fn create_obj_showcase() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        .add_checkered_floor(10, "grass_top", "dirt")
+        
+        // Cargar tu modelo OBJ
+        .add_model("assets/cube.obj", 0.0, 2.0, 0.0, 2.0, "stone")
+        .add_model("assets/cube.obj", -4.0, 1.0, 0.0, 1.5, "wood")
+        .add_model("assets/cube.obj", 4.0, 1.0, 0.0, 1.5, "gold")
+        
+        // Pedestal para cada modelo
+        .add_cube(0.0, 0.5, 0.0, 1.5, "stone")
+        .add_cube(-4.0, 0.5, 0.0, 1.2, "dirt")
+        .add_cube(4.0, 0.5, 0.0, 1.2, "dirt")
+        
+        .add_sun(10.0, 15.0, 10.0, 3.5)
+        .add_light(-10.0, 10.0, -10.0, Color::new(100, 100, 255, 255), 2.0)
+        .build()
+}
+
+// === EJEMPLO 8: ESCENA NETHER ===
+fn create_nether_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        // Piso de netherrack
+        .add_floor(15, "netherrack")
+        
+        // Estructuras de nether brick
+        .add_box(-5, 0, -5, 10, 4, 10, "nether_brick")
+        
+        // Torres con soul sand
+        .add_tower(-8, -8, 6, "soul_sand")
+        .add_tower(8, -8, 6, "soul_sand")
+        .add_tower(-8, 8, 6, "soul_sand")
+        .add_tower(8, 8, 6, "soul_sand")
+        
+        // Lagos de lava
+        .add_cubes(
+            &[
+                (12.0, 0.0, 0.0), (13.0, 0.0, 0.0),
+                (12.0, 0.0, 1.0), (13.0, 0.0, 1.0),
+            ],
+            1.0,
+            "lava"
+        )
+        
+        // Iluminación rojiza
+        .add_light(0.0, 10.0, 0.0, Color::new(255, 100, 50, 255), 3.0)
+        .add_light(12.0, 1.0, 0.0, Color::new(255, 80, 20, 255), 2.5)
+        .add_light(-10.0, 5.0, -10.0, Color::new(200, 50, 30, 255), 2.0)
+        
+        .build()
+}
 
 const ORIGIN_BIAS: f32 = 1e-4;
 const MAX_DEPTH: u32 = 2;
@@ -228,111 +442,6 @@ pub fn render(
     }
 }
 
-fn create_scene_with_obj() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    let mut objects: Vec<Arc<dyn RayIntersect + Send + Sync>> = Vec::new();
-
-    // ========== MATERIALES CON TEXTURAS ==========
-    
-    let grass = Material::new(
-        Vector3::new(0.2, 0.8, 0.2),
-        10.0,
-        [0.9, 0.1],
-        0.0,
-        0.0,
-        Vector3::zero(),
-        Some("grass_top".to_string()),
-    );
-
-    let dirt = Material::new(
-        Vector3::new(0.6, 0.4, 0.2),
-        5.0,
-        [0.85, 0.05],
-        0.0,
-        0.0,
-        Vector3::zero(),
-        Some("dirt".to_string()),
-    );
-
-    let wood = Material::new(
-        Vector3::new(0.4, 0.25, 0.1),
-        8.0,
-        [0.75, 0.08],
-        0.0,
-        0.0,
-        Vector3::zero(),
-        Some("wood".to_string()),
-    );
-
-    let stone = Material::new(
-        Vector3::new(0.5, 0.5, 0.5),
-        15.0,
-        [0.8, 0.15],
-        0.0,
-        0.0,
-        Vector3::zero(),
-        Some("stone".to_string()),
-    );
-
-    // ========== CARGAR MODELOS OBJ ==========
-    
-    // Cubo de ejemplo con textura de piedra
-    if let Ok(cube_mesh) = Mesh::from_obj(
-        "assets/cube.obj",
-        stone.clone(),
-        Vector3::new(0.0, 3.0, 0.0),
-        1.0,
-    ) {
-        objects.extend(cube_mesh.to_objects());
-        println!("✅ Cubo OBJ cargado exitosamente");
-    } else {
-        println!("⚠️  No se pudo cargar cube.obj, usando cubo simple");
-        objects.push(Arc::new(Cube::new(
-            Vector3::new(0.0, 3.0, 0.0),
-            2.0,
-            stone.clone(),
-        )));
-    }
-
-    // Segundo cubo con textura de madera
-    if let Ok(wood_cube) = Mesh::from_obj(
-        "assets/cube.obj",
-        wood.clone(),
-        Vector3::new(3.0, 2.0, 0.0),
-        0.8,
-    ) {
-        objects.extend(wood_cube.to_objects());
-        println!("✅ Cubo de madera cargado");
-    }
-
-    // ========== SUELO ==========
-    for x in -5..=5 {
-        for z in -5..=5 {
-            objects.push(Arc::new(Cube::new(
-                Vector3::new(x as f32, 0.0, z as f32),
-                1.0,
-                if (x + z) % 2 == 0 { grass.clone() } else { dirt.clone() },
-            )));
-        }
-    }
-
-    // ========== LUCES ==========
-    let lights = vec![
-        Light::new(
-            Vector3::new(5.0, 10.0, 5.0),
-            Color::new(255, 250, 240, 255),
-            3.5,
-        ),
-        Light::new(
-            Vector3::new(-5.0, 8.0, -5.0),
-            Color::new(255, 200, 150, 255),
-            2.0,
-        ),
-    ];
-
-    println!("🎨 Escena creada: {} objetos", objects.len());
-    (objects, lights)
-}
-
 fn main() {
     let window_width = 800;
     let window_height = 600;
@@ -346,7 +455,7 @@ fn main() {
     let mut framebuffer = Framebuffer::new(window_width as u32, window_height as u32);
 
     println!("📦 Cargando escena con modelos OBJ...");
-    let (objects, lights) = create_scene_with_obj();
+    let (objects, lights) = create_house_scene();
 
     let mut camera = Camera::new(
         Vector3::new(8.0, 6.0, 8.0),
