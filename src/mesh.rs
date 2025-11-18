@@ -102,7 +102,7 @@ impl Mesh {
     /// Carga una malla desde un archivo .obj
     pub fn from_obj(
         path: &str,
-        material: Material,
+        material: &Material,
         position: Vector3,
         scale: f32,
     ) -> Result<Self, String> {
@@ -195,7 +195,7 @@ impl Mesh {
             }
         }
 
-        println!("✅ Malla cargada: {} triángulos desde {}", triangles.len(), path);
+        println!("Malla cargada: {} triángulos desde {}", triangles.len(), path);
         Ok(Mesh { triangles })
     }
 
