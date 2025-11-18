@@ -14,233 +14,142 @@ mod mesh;
 mod scene_builder;
 
 use framebuffer::Framebuffer;
-use ray_intersect::{Intersect, RayIntersect};
+use ray_intersect::{Intersect, RayIntersect, BVH};
 use camera::Camera;
 use light::Light;
 use material::{Material, vector3_to_color};
-use cube::Cube;
 use texture::TextureManager;
-use mesh::Mesh;
 use crate::scene_builder::{SceneBuilder, WallDirection};
-
-// === EJEMPLO 1: ESCENA SIMPLE ===
-fn create_simple_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        .add_floor(10, "grass_top")              // Piso de césped 21x21
-        .add_cube(0.0, 1.0, 0.0, 2.0, "stone")  // Cubo de piedra en el centro
-        .add_sun(10.0, 15.0, 10.0, 3.0)         // Sol
-        .build()
-}
-
-// === EJEMPLO 2: CASA CON JARDÍN ===
-fn create_house_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        // Piso estilo tablero
-        .add_checkered_floor(10, "grass_top", "dirt")
-        
-        // Casa principal
-        .add_house(0, 0)
-        
-        // Árboles alrededor
-        .add_tree(-5, -5)
-        .add_tree(-5, 5)
-        .add_tree(8, -5)
-        .add_tree(8, 5)
-        
-        // Iluminación
-        .add_sun(15.0, 20.0, 15.0, 3.5)
-        .build()
-}
-
-// === EJEMPLO 3: CASTILLO ===
-fn create_castle_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        // Piso de piedra
-        .add_floor(20, "stone")
-        
-        // Torres en las esquinas
-        .add_tower(-10, -10, 8, "stone")
-        .add_tower(-10, 10, 8, "stone")
-        .add_tower(10, -10, 8, "stone")
-        .add_tower(10, 10, 8, "stone")
-        
-        // Murallas conectando las torres
-        .add_wall(-10, -10, 21, 5, WallDirection::North, "stone")
-        .add_wall(-10, 10, 21, 5, WallDirection::South, "stone")
-        .add_wall(-10, -10, 21, 5, WallDirection::East, "stone")
-        .add_wall(10, -10, 21, 5, WallDirection::West, "stone")
-        
-        // Torreones dorados en las torres
-        .add_cube(-10.0, 8.0, -10.0, 1.0, "gold")
-        .add_cube(-10.0, 8.0, 10.0, 1.0, "gold")
-        .add_cube(10.0, 8.0, -10.0, 1.0, "gold")
-        .add_cube(10.0, 8.0, 10.0, 1.0, "gold")
-        
-        // Antorchas en las murallas
-        .add_torches(&[
-            (-5.0, 5.0, -10.0),
-            (0.0, 5.0, -10.0),
-            (5.0, 5.0, -10.0),
-            (-10.0, 5.0, -5.0),
-            (-10.0, 5.0, 5.0),
-        ])
-        
-        // Sol y luna (dos luces)
-        .add_sun(20.0, 25.0, 20.0, 4.0)
-        .add_light(-20.0, 15.0, -20.0, Color::new(150, 150, 200, 255), 2.0)
-        
-        .build()
-}
-
-// === EJEMPLO 4: GALERÍA DE MATERIALES ===
-fn create_material_showcase() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    let materials = vec![
-        "stone", "wood", "gold", "silver", "glass",
-        "water", "lava", "glowstone", "dirt", "leaves"
-    ];
-    
-    let mut builder = SceneBuilder::new()
-        .add_checkered_floor(10, "grass_top", "dirt");
-    
-    // Crear una fila de cubos con diferentes materiales
-    for (i, material) in materials.iter().enumerate() {
-        let x = (i as f32 - materials.len() as f32 / 2.0) * 2.5;
-        builder = builder.add_cube(x, 1.0, 0.0, 1.5, material);
-    }
-    
-    builder
-        .add_sun(0.0, 20.0, 15.0, 4.0)
-        .add_light(0.0, 5.0, -10.0, Color::new(255, 100, 100, 255), 2.0)
-        .build()
-}
-
-// === EJEMPLO 5: PUEBLO ===
-fn create_village_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        // Terreno
-        .add_floor(25, "grass_top")
-        
-        // Casas distribuidas
-        .add_house(-15, -15)
-        .add_house(-15, 5)
-        .add_house(5, -15)
-        .add_house(5, 5)
-        
-        // Plaza central con fuente
-        .add_cubes(
-            &[
-                (0.0, 0.0, 0.0),
-                (1.0, 0.0, 0.0), (-1.0, 0.0, 0.0),
-                (0.0, 0.0, 1.0), (0.0, 0.0, -1.0),
-            ],
-            1.0,
-            "stone"
-        )
-        .add_cube(0.0, 1.0, 0.0, 0.5, "water")
-        
-        // Árboles decorativos
-        .add_tree(-20, 0)
-        .add_tree(0, -20)
-        .add_tree(20, 0)
-        .add_tree(0, 20)
-        .add_tree(-10, -10)
-        .add_tree(10, 10)
-        
-        // Farolas
-        .add_tower(-5, -5, 3, "stone")
-        .add_torch(-5.0, 3.0, -5.0)
-        .add_tower(5, 5, 3, "stone")
-        .add_torch(5.0, 3.0, 5.0)
-        
-        // Iluminación ambiental
-        .add_sun(30.0, 40.0, 30.0, 4.0)
-        .add_light(-30.0, 20.0, -30.0, Color::new(200, 200, 255, 255), 1.5)
-        
-        .build()
-}
-
-// === EJEMPLO 6: LABERINTO ===
-fn create_maze_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    let mut builder = SceneBuilder::new()
-        .add_floor(15, "stone");
-    
-    // Paredes del laberinto (patrón simple)
-    let walls = vec![
-        ((-10, -10), 5, WallDirection::North),
-        ((-10, 0), 8, WallDirection::East),
-        ((0, -5), 10, WallDirection::North),
-        ((5, 0), 6, WallDirection::East),
-    ];
-    
-    for ((x, z), length, direction) in walls {
-        builder = builder.add_wall(x, z, length, 3, direction, "nether_brick");
-    }
-    
-    builder
-        .add_torch(0.0, 1.0, 0.0)
-        .add_sun(20.0, 30.0, 20.0, 3.0)
-        .build()
-}
-
-// === EJEMPLO 7: MODELO OBJ PERSONALIZADO ===
-fn create_obj_showcase() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        .add_checkered_floor(10, "grass_top", "dirt")
-        
-        // Cargar tu modelo OBJ
-        .add_model("assets/cube.obj", 0.0, 2.0, 0.0, 2.0, "stone")
-        .add_model("assets/cube.obj", -4.0, 1.0, 0.0, 1.5, "wood")
-        .add_model("assets/cube.obj", 4.0, 1.0, 0.0, 1.5, "gold")
-        
-        // Pedestal para cada modelo
-        .add_cube(0.0, 0.5, 0.0, 1.5, "stone")
-        .add_cube(-4.0, 0.5, 0.0, 1.2, "dirt")
-        .add_cube(4.0, 0.5, 0.0, 1.2, "dirt")
-        
-        .add_sun(10.0, 15.0, 10.0, 3.5)
-        .add_light(-10.0, 10.0, -10.0, Color::new(100, 100, 255, 255), 2.0)
-        .build()
-}
-
-// === EJEMPLO 8: ESCENA NETHER ===
-fn create_nether_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        // Piso de netherrack
-        .add_floor(15, "netherrack")
-        
-        // Estructuras de nether brick
-        .add_box(-5, 0, -5, 10, 4, 10, "nether_brick")
-        
-        // Torres con soul sand
-        .add_tower(-8, -8, 6, "soul_sand")
-        .add_tower(8, -8, 6, "soul_sand")
-        .add_tower(-8, 8, 6, "soul_sand")
-        .add_tower(8, 8, 6, "soul_sand")
-        
-        // Lagos de lava
-        .add_cubes(
-            &[
-                (12.0, 0.0, 0.0), (13.0, 0.0, 0.0),
-                (12.0, 0.0, 1.0), (13.0, 0.0, 1.0),
-            ],
-            1.0,
-            "lava"
-        )
-        
-        // Iluminación rojiza
-        .add_light(0.0, 10.0, 0.0, Color::new(255, 100, 50, 255), 3.0)
-        .add_light(12.0, 1.0, 0.0, Color::new(255, 80, 20, 255), 2.5)
-        .add_light(-10.0, 5.0, -10.0, Color::new(200, 50, 30, 255), 2.0)
-        
-        .build()
-}
 
 const ORIGIN_BIAS: f32 = 1e-4;
 const MAX_DEPTH: u32 = 2;
 
-// TextureManager global (thread-safe)
 lazy_static::lazy_static! {
     static ref TEXTURE_MANAGER: Arc<TextureManager> = Arc::new(TextureManager::new());
+}
+
+// === ESCENAS PREDEFINIDAS ===
+
+fn create_simple_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        .add_floor(10, "grass_top")
+        .add_cube(0.0, 1.0, 0.0, 2.0, "stone")
+        .add_sun(10.0, 15.0, 10.0, 3.0)
+        .build()
+}
+
+fn create_house_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        .add_checkered_floor(10, "grass_top", "dirt")
+        .add_house(0, 0)
+        .add_tree(-5, -5)
+        .add_tree(-5, 5)
+        .add_tree(8, -5)
+        .add_tree(8, 5)
+        .add_sun(15.0, 20.0, 15.0, 3.5)
+        .build()
+}
+
+fn create_castle_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        .add_floor(20, "stone")
+        .add_tower(-10, -10, 8, "stone")
+        .add_tower(-10, 10, 8, "stone")
+        .add_tower(10, -10, 8, "stone")
+        .add_tower(10, 10, 8, "stone")
+        .add_wall(-10, -10, 21, 5, WallDirection::North, "stone")
+        .add_wall(-10, 10, 21, 5, WallDirection::South, "stone")
+        .add_wall(-10, -10, 21, 5, WallDirection::East, "stone")
+        .add_wall(10, -10, 21, 5, WallDirection::West, "stone")
+        .add_torches(&[
+            (-5.0, 5.0, -10.0),
+            (0.0, 5.0, -10.0),
+            (5.0, 5.0, -10.0),
+        ])
+        .add_sun(20.0, 25.0, 20.0, 4.0)
+        .build()
+}
+
+// === ESCENAS DE ISLA FLOTANTE ===
+
+fn create_floating_island_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    println!("🏝️  Generando isla flotante básica...");
+    let center_x = 0;
+    let center_y = 10;
+    let center_z = 0;
+    let radius = 6;
+    
+    SceneBuilder::new()
+        .add_floating_island(center_x, center_y, center_z, radius)
+        .add_island_vegetation(center_x, center_y, center_z, radius)
+        .add_nether_reflection(center_x, -center_y, center_z, radius)
+        .add_nether_features(center_x, -center_y, center_z, radius)
+        .add_checkered_floor(3, "glass", "stone")
+        .add_dual_world_lighting(center_x as f32, center_z as f32)
+        .build()
+}
+
+fn create_floating_island_with_waterfalls() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    println!("🏝️  Generando isla flotante con cascadas...");
+    let center_x = 0;
+    let center_y = 12;
+    let center_z = 0;
+    let radius = 7;
+    
+    let mut builder = SceneBuilder::new();
+    
+    builder = builder.add_floating_island(center_x, center_y, center_z, radius);
+    builder = builder.add_island_vegetation(center_x, center_y, center_z, radius);
+    
+    println!("   💧 Añadiendo cascadas...");
+    // Cascadas de agua cayendo desde los bordes
+    for i in 0..6 {
+        let angle = (i as f32) * std::f32::consts::PI / 3.0;
+        let x = center_x as f32 + (radius as f32 * 0.8) * angle.cos();
+        let z = center_z as f32 + (radius as f32 * 0.8) * angle.sin();
+        
+        for h in 0..10 {
+            builder = builder.add_cube(x, (center_y + radius - h * 2) as f32, z, 0.3, "water");
+        }
+    }
+    
+    builder = builder.add_nether_reflection(center_x, -center_y, center_z, radius);
+    builder = builder.add_nether_features(center_x, -center_y, center_z, radius);
+    builder = builder.add_dual_world_lighting(center_x as f32, center_z as f32);
+    
+    builder.build()
+}
+
+fn create_floating_island_with_bridge() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    println!("🏝️  Generando isla flotante con puente portal...");
+    let center_x = 0;
+    let center_y = 10;
+    let center_z = 0;
+    let radius = 6;
+    
+    let mut builder = SceneBuilder::new();
+    
+    builder = builder.add_floating_island(center_x, center_y, center_z, radius);
+    builder = builder.add_island_vegetation(center_x, center_y, center_z, radius);
+    builder = builder.add_nether_reflection(center_x, -center_y, center_z, radius);
+    builder = builder.add_nether_features(center_x, -center_y, center_z, radius);
+    
+    // Puente vertical conectando ambos mundos (portal)
+    println!("   🌉 Construyendo puente portal...");
+    for y in (-center_y + radius)..(center_y - radius) {
+        builder = builder
+            .add_cube(center_x as f32 - 1.0, y as f32, center_z as f32, 0.3, "glass")
+            .add_cube(center_x as f32 + 1.0, y as f32, center_z as f32, 0.3, "glass");
+        
+        // Partículas de portal cada 2 bloques
+        if y % 2 == 0 {
+            builder = builder.add_cube(center_x as f32, y as f32, center_z as f32, 0.2, "glowstone");
+        }
+    }
+    
+    builder = builder.add_dual_world_lighting(center_x as f32, center_z as f32);
+    
+    builder.build()
 }
 
 fn sky_color(dir: Vector3, is_nether: bool) -> Vector3 {
@@ -290,17 +199,17 @@ fn reflect(incident: &Vector3, normal: &Vector3) -> Vector3 {
 fn cast_shadow(
     intersect: &Intersect,
     light: &Light,
+    bvh: &BVH,
     objects: &[Arc<dyn RayIntersect + Send + Sync>],
 ) -> f32 {
     let light_dir = (light.position - intersect.point).normalized();
     let light_distance = (light.position - intersect.point).length();
     let shadow_ray_origin = offset_origin(intersect, &light_dir);
 
-    for object in objects.iter() {
-        let shadow_intersect = object.ray_intersect(&shadow_ray_origin, &light_dir);
-        if shadow_intersect.is_intersecting && shadow_intersect.distance < light_distance {
-            return 0.6;
-        }
+    let shadow_intersect = bvh.intersect(&shadow_ray_origin, &light_dir, objects);
+    
+    if shadow_intersect.is_intersecting && shadow_intersect.distance < light_distance {
+        return 0.6;
     }
     0.0
 }
@@ -308,6 +217,7 @@ fn cast_shadow(
 pub fn cast_ray(
     ray_origin: &Vector3,
     ray_direction: &Vector3,
+    bvh: &BVH,
     objects: &[Arc<dyn RayIntersect + Send + Sync>],
     lights: &[Light],
     depth: u32,
@@ -317,23 +227,13 @@ pub fn cast_ray(
         return sky_color(*ray_direction, is_nether);
     }
 
-    let mut intersect = Intersect::empty();
-    let mut zbuffer = f32::INFINITY;
-
-    for object in objects {
-        let i = object.ray_intersect(ray_origin, ray_direction);
-        if i.is_intersecting && i.distance < zbuffer {
-            zbuffer = i.distance;
-            intersect = i;
-        }
-    }
+    let intersect = bvh.intersect(ray_origin, ray_direction, objects);
 
     if !intersect.is_intersecting {
         let is_nether = ray_origin.y < 0.0;
         return sky_color(*ray_direction, is_nether);
     }
 
-    // Aplicar textura si el material tiene una
     let mut diffuse_color = intersect.material.diffuse;
     if let Some(ref texture_name) = intersect.material.texture_path {
         let texture_color = TEXTURE_MANAGER.sample(texture_name, intersect.u, intersect.v);
@@ -365,7 +265,7 @@ pub fn cast_ray(
         let distance = (light.position - intersect.point).length();
         let attenuation = 1.0 / (1.0 + 0.05 * distance + 0.01 * distance * distance);
 
-        let shadow_intensity = cast_shadow(&intersect, light, objects);
+        let shadow_intensity = cast_shadow(&intersect, light, bvh, objects);
         let light_intensity = light.intensity * (1.0 - shadow_intensity) * attenuation;
 
         let light_color_v3 = Vector3::new(
@@ -392,7 +292,7 @@ pub fn cast_ray(
     if reflectivity > 0.05 && depth < MAX_DEPTH {
         let reflect_dir = reflect(ray_direction, &intersect.normal).normalized();
         let reflect_origin = offset_origin(&intersect, &reflect_dir);
-        let reflect_color = cast_ray(&reflect_origin, &reflect_dir, objects, lights, depth + 1);
+        let reflect_color = cast_ray(&reflect_origin, &reflect_dir, bvh, objects, lights, depth + 1);
         final_color = final_color * (1.0 - reflectivity) + reflect_color * reflectivity;
     }
 
@@ -401,6 +301,7 @@ pub fn cast_ray(
 
 pub fn render(
     framebuffer: &mut Framebuffer,
+    bvh: &BVH,
     objects: &[Arc<dyn RayIntersect + Send + Sync>],
     camera: &Camera,
     lights: &[Light],
@@ -408,7 +309,7 @@ pub fn render(
     let width = framebuffer.width as usize;
     let height = framebuffer.height as usize;
     let aspect_ratio = width as f32 / height as f32;
-    let fov = PI / 3.0;
+    let fov = PI / 2.0; // 90 grados - FOV más amplio para ver más escena
     let perspective_scale = (fov * 0.5).tan();
 
     let pixels: Vec<Color> = (0..height)
@@ -425,7 +326,7 @@ pub fn render(
                 let ray_direction = Vector3::new(screen_x, screen_y, -1.0).normalized();
                 let rotated_direction = camera.basis_change(&ray_direction);
 
-                let pixel_color_v3 = cast_ray(&camera.eye, &rotated_direction, objects, lights, 0);
+                let pixel_color_v3 = cast_ray(&camera.eye, &rotated_direction, bvh, objects, lights, 0);
                 let pixel_color = vector3_to_color(pixel_color_v3);
 
                 row_colors.push(pixel_color);
@@ -448,37 +349,116 @@ fn main() {
 
     let (mut window, thread) = raylib::init()
         .size(window_width, window_height)
-        .title("🎮 Ray Tracer con Modelos OBJ y Texturas")
+        .title("🏝️ Ray Tracer - Isla Flotante con Reflejo Nether")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
 
     let mut framebuffer = Framebuffer::new(window_width as u32, window_height as u32);
 
-    println!("📦 Cargando escena con modelos OBJ...");
-    let (objects, lights) = create_house_scene();
+    println!("\n╔════════════════════════════════════════╗");
+    println!("║   🏝️  RAY TRACER - ISLA FLOTANTE  🏝️   ║");
+    println!("╚════════════════════════════════════════╝\n");
 
-    let mut camera = Camera::new(
-        Vector3::new(8.0, 6.0, 8.0),
-        Vector3::new(0.0, 2.0, 0.0),
-        Vector3::new(0.0, 1.0, 0.0),
-    );
+    println!("📦 Selecciona tu escena:\n");
+    println!("1. 🏝️  Isla Flotante Básica");
+    println!("2. 💧 Isla con Cascadas");
+    println!("3. 🌉 Isla con Puente Portal");
+    println!("4. 🏰 Castillo");
+    println!("5. 🏠 Casa con Jardín");
+    println!("6. 📦 Escena Simple\n");
+
+    // CAMBIA ESTE NÚMERO PARA ELEGIR LA ESCENA
+    let scene_choice = 4;
+
+    let start = std::time::Instant::now();
+    
+    let (objects, lights) = match scene_choice {
+        1 => create_floating_island_scene(),
+        2 => create_floating_island_with_waterfalls(),
+        3 => create_floating_island_with_bridge(),
+        4 => create_castle_scene(),
+        5 => create_house_scene(),
+        _ => create_simple_scene(),
+    };
+    
+    println!("\n⚡ Construyendo BVH para {} objetos...", objects.len());
+    let bvh_start = std::time::Instant::now();
+    let bvh = BVH::build(&objects);
+    println!("✅ BVH construido en {:.3}s", bvh_start.elapsed().as_secs_f32());
+    
+    // Debug: mostrar bounds de la escena
+    if !objects.is_empty() {
+        let first_bounds = objects[0].get_bounds();
+        let mut min = first_bounds.min;
+        let mut max = first_bounds.max;
+        
+        for obj in &objects[1..] {
+            let bounds = obj.get_bounds();
+            min.x = min.x.min(bounds.min.x);
+            min.y = min.y.min(bounds.min.y);
+            min.z = min.z.min(bounds.min.z);
+            max.x = max.x.max(bounds.max.x);
+            max.y = max.y.max(bounds.max.y);
+            max.z = max.z.max(bounds.max.z);
+        }
+        
+        println!("📊 Bounds de la escena:");
+        println!("   Min: ({:.1}, {:.1}, {:.1})", min.x, min.y, min.z);
+        println!("   Max: ({:.1}, {:.1}, {:.1})", max.x, max.y, max.z);
+        println!("   Centro aprox: ({:.1}, {:.1}, {:.1})", 
+                 (min.x + max.x) / 2.0,
+                 (min.y + max.y) / 2.0,
+                 (min.z + max.z) / 2.0);
+    }
+    
+    println!("📊 Tiempo total de carga: {:.3}s\n", start.elapsed().as_secs_f32());
+
+    // Ajustar cámara según la escena elegida
+    let mut camera = if scene_choice <= 3 {
+        // Escenas de isla flotante - vista más cercana y centrada
+        println!("📷 Posicionando cámara para vista de isla flotante...");
+        Camera::new(
+            Vector3::new(18.0, 0.0, 18.0),    // Más cerca, a nivel medio
+            Vector3::new(0.0, -3.0, 0.0),     // Mirar ligeramente abajo del centro
+            Vector3::new(0.0, 1.0, 0.0),
+        )
+    } else {
+        // Otras escenas - cámara normal
+        Camera::new(
+            Vector3::new(15.0, 8.0, 15.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        )
+    };
 
     let rotation_speed = PI / 60.0;
-    let zoom_speed = 0.3;
+    let zoom_speed = 0.5;
 
     println!("🎨 Renderizando escena inicial...");
-    let start = std::time::Instant::now();
-    render(&mut framebuffer, &objects, &camera, &lights);
-    println!("✨ Renderizado en {:.2}s", start.elapsed().as_secs_f32());
+    let render_start = std::time::Instant::now();
+    render(&mut framebuffer, &bvh, &objects, &camera, &lights);
+    println!("✨ Primera imagen renderizada en {:.3}s", render_start.elapsed().as_secs_f32());
 
     window.set_target_fps(30);
 
-    println!("\n🎮 Controles:");
-    println!("  ← → : Rotar horizontalmente");
-    println!("  ↑ ↓ : Rotar verticalmente");
-    println!("  W S : Zoom in/out");
-    println!("  ESC : Salir");
-    println!("\n✨ Observa las texturas procedurales en los cubos OBJ!");
+    println!("\n╔════════════════════════════════════════╗");
+    println!("║            🎮 CONTROLES 🎮             ║");
+    println!("╠════════════════════════════════════════╣");
+    println!("║  ← →  : Rotar horizontalmente          ║");
+    println!("║  ↑ ↓  : Rotar verticalmente            ║");
+    println!("║  W S  : Zoom in/out                    ║");
+    println!("║  I    : Info de cámara                 ║");
+    println!("║  R    : Reset cámara                   ║");
+    println!("║  ESC  : Salir                          ║");
+    println!("╚════════════════════════════════════════╝\n");
+
+    if scene_choice <= 3 {
+        println!("✨ Observa la isla flotante en el Overworld arriba");
+        println!("🔥 y su reflejo oscuro en el Nether abajo!\n");
+    }
+
+    let mut frame_count = 0;
+    let mut total_render_time = 0.0;
 
     while !window.window_should_close() {
         let mut needs_render = false;
@@ -507,14 +487,54 @@ fn main() {
             camera.zoom(-zoom_speed);
             needs_render = true;
         }
+        
+        // Info de cámara (tecla I)
+        if window.is_key_pressed(KeyboardKey::KEY_I) {
+            println!("\n📷 INFO DE CÁMARA:");
+            println!("   Posición: ({:.1}, {:.1}, {:.1})", camera.eye.x, camera.eye.y, camera.eye.z);
+            println!("   Mirando a: ({:.1}, {:.1}, {:.1})", camera.center.x, camera.center.y, camera.center.z);
+            println!("   Distancia al centro: {:.1}", (camera.eye - camera.center).length());
+        }
+        
+        // Reset cámara (tecla R)
+        if window.is_key_pressed(KeyboardKey::KEY_R) {
+            if scene_choice <= 3 {
+                camera = Camera::new(
+                    Vector3::new(18.0, 0.0, 18.0),
+                    Vector3::new(0.0, -3.0, 0.0),
+                    Vector3::new(0.0, 1.0, 0.0),
+                );
+            } else {
+                camera = Camera::new(
+                    Vector3::new(15.0, 8.0, 15.0),
+                    Vector3::new(0.0, 0.0, 0.0),
+                    Vector3::new(0.0, 1.0, 0.0),
+                );
+            }
+            println!("📷 Cámara reseteada");
+            needs_render = true;
+        }
 
         if needs_render {
-            let start = std::time::Instant::now();
-            render(&mut framebuffer, &objects, &camera, &lights);
-            let elapsed = start.elapsed().as_secs_f32();
-            println!("⚡ Frame: {:.3}s ({:.1} FPS)", elapsed, 1.0 / elapsed);
+            let frame_start = std::time::Instant::now();
+            render(&mut framebuffer, &bvh, &objects, &camera, &lights);
+            let elapsed = frame_start.elapsed().as_secs_f32();
+            
+            frame_count += 1;
+            total_render_time += elapsed;
+            let avg_time = total_render_time / frame_count as f32;
+            
+            println!("⚡ Frame {}: {:.3}s ({:.1} FPS) | Promedio: {:.3}s", 
+                     frame_count, elapsed, 1.0 / elapsed, avg_time);
         }
 
         framebuffer.swap_buffers(&mut window, &thread);
+    }
+
+    println!("\n👋 ¡Gracias por usar el Ray Tracer!");
+    println!("📊 Estadísticas finales:");
+    println!("   Frames renderizados: {}", frame_count);
+    if frame_count > 0 {
+        println!("   Tiempo promedio: {:.3}s/frame", total_render_time / frame_count as f32);
     }
 }
