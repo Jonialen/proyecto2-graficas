@@ -284,36 +284,36 @@ pub fn render(
 fn print_scene_info(scene_num: i32, obj_count: usize, light_count: usize) {
     let info = SceneInfo::get(scene_num);
     println!("╔════════════════════════════════════════╗");
-    println!("║  🎬 ESCENA CARGADA: {:2}                 ║", scene_num);
+    println!("║  ESCENA CARGADA: {:2}                 ║", scene_num);
     println!("╠════════════════════════════════════════╣");
     println!("║  {:38} ║", info.name);
     println!("╠════════════════════════════════════════╣");
-    println!("║  📊 Objetos: {:5}                      ║", obj_count);
-    println!("║  💡 Luces: {:2}                          ║", light_count);
+    println!("║  Objetos: {:5}                      ║", obj_count);
+    println!("║  Luces: {:2}                          ║", light_count);
     println!("╚════════════════════════════════════════╝");
 }
 
 fn get_time_description(time_of_day: f32) -> &'static str {
     if time_of_day < 0.2 {
-        "🌙 Noche"
+        "Noche"
     } else if time_of_day < 0.3 {
-        "🌅 Amanecer (Morado)"
+        "Amanecer (Morado)"
     } else if time_of_day < 0.35 {
-        "🌄 Amanecer (Naranja)"
+        "Amanecer (Naranja)"
     } else if time_of_day < 0.45 {
-        "☀️  Mañana"
+        "Mañana"
     } else if time_of_day < 0.65 {
-        "☀️  Mediodía"
+        "Mediodía"
     } else if time_of_day < 0.7 {
-        "🌤️  Tarde"
+        "Tarde"
     } else if time_of_day < 0.75 {
-        "🌇 Atardecer (Naranja)"
+        "Atardecer (Naranja)"
     } else if time_of_day < 0.8 {
-        "🌆 Atardecer (Rojo)"
+        "Atardecer (Rojo)"
     } else if time_of_day < 0.9 {
-        "🌃 Crepúsculo"
+        "Crepúsculo"
     } else {
-        "🌙 Anochecer"
+        "Anochecer"
     }
 }
 
@@ -324,7 +324,7 @@ fn main() {
 
     let (mut window, thread) = raylib::init()
         .size(window_width, window_height)
-        .title("🏝️ Ray Tracer - Minecraft Style")
+        .title("Ray Tracer - Minecraft Style")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
 
@@ -335,23 +335,23 @@ fn main() {
     let mut absolute_time = 0.0f32;
 
     println!("\n╔════════════════════════════════════════╗");
-    println!("║   🏝️  RAY TRACER - MINECRAFT STYLE 🏝️  ║");
+    println!("║     RAY TRACER - MINECRAFT STYLE     ║");
     println!("╚════════════════════════════════════════╝\n");
     
-    println!("📦 ESCENAS DISPONIBLES:");
+    println!("Escenas disponibles:");
     println!("┌────────────────────────────────────────┐");
-    println!("│ [1] 🏝️  Isla Flotante Básica          │");
-    println!("│ [2] 💧 Isla con Cascadas               │");
-    println!("│ [3] 🌉 Isla con Puente Portal          │");
-    println!("│ [4] 🏰 Castillo Medieval               │");
-    println!("│ [5] 🏠 Casa con Jardín                 │");
-    println!("│ [6] 📦 Escena Simple                   │");
-    println!("│ [7] 🏘️  Aldea Medieval                 │");
-    println!("│ [8] 🌲 Bosque Encantado                │");
-    println!("│ [9] 🏝️  Archipiélago Masivo            │");
-    println!("│ [0] 🏛️  Templo Antiguo                 │");
-    println!("│ [-] 🏔️  Cañón con Río                  │");
-    println!("│ [=] 🌀 Portal Dimensional ⭐          │");
+    println!("│ [1] Isla Flotante Básica               │");
+    println!("│ [2] Isla con Cascadas                  │");
+    println!("│ [3] Isla con Puente Portal             │");
+    println!("│ [4] Castillo Medieval                  │");
+    println!("│ [5] Casa con Jardín                    │");
+    println!("│ [6] Escena Simple                      │");
+    println!("│ [7] Aldea Medieval                     │");
+    println!("│ [8] Bosque Encantado                   │");
+    println!("│ [9] Archipiélago Masivo                │");
+    println!("│ [0] Templo Antiguo                     │");
+    println!("│ [-] Cañón con Río                      │");
+    println!("│ [=] Portal Dimensional                 │");
     println!("└────────────────────────────────────────┘\n");
 
     let mut scene_choice = 1;
@@ -366,23 +366,23 @@ fn main() {
         Vector3::new(0.0, 1.0, 0.0),
     );
     
-    println!("⚡ Construyendo BVH...");
+    println!("Construyendo BVH...");
     let bvh_start = std::time::Instant::now();
     let mut bvh = BVH::build(&objects);
-    println!("✅ BVH construido en {:.3}s\n", bvh_start.elapsed().as_secs_f32());
+    println!("BVH construido en {:.3}s\n", bvh_start.elapsed().as_secs_f32());
 
     let rotation_speed = PI / 60.0;
     let zoom_speed = 0.5;
 
-    println!("🎨 Renderizando primera imagen...");
+    println!("Renderizando primera imagen...");
     let render_start = std::time::Instant::now();
     render(&mut framebuffer, &bvh, &objects, &camera, &lights, day_night.get_time_of_day(), absolute_time);
-    println!("✨ Renderizado inicial: {:.3}s\n", render_start.elapsed().as_secs_f32());
+    println!("Renderizado inicial: {:.3}s\n", render_start.elapsed().as_secs_f32());
 
     window.set_target_fps(30);
 
     println!("╔════════════════════════════════════════╗");
-    println!("║            🎮 CONTROLES 🎮             ║");
+    println!("║              CONTROLES                 ║");
     println!("╠════════════════════════════════════════╣");
     println!("║  1-9,0,-,= : Cambiar escena           ║");
     println!("║  ← →       : Rotar horizontalmente    ║");
@@ -415,18 +415,18 @@ fn main() {
 
         if window.is_key_pressed(KeyboardKey::KEY_P) {
             paused = !paused;
-            println!("⏯️  Day/Night Cycle: {}", if paused { "Pausado" } else { "Activo" });
+            println!("Day/Night Cycle: {}", if paused { "Pausado" } else { "Activo" });
         }
 
         if window.is_key_pressed(KeyboardKey::KEY_LEFT_BRACKET) {
             day_night.time = (day_night.time + 5.0) % day_night.cycle_duration;
-            println!("⏩ Tiempo adelantado: {}", get_time_description(day_night.get_time_of_day()));
+            println!("Tiempo adelantado: {}", get_time_description(day_night.get_time_of_day()));
             needs_render = true;
         }
 
         if window.is_key_pressed(KeyboardKey::KEY_RIGHT_BRACKET) {
             day_night.time = (day_night.time - 5.0 + day_night.cycle_duration) % day_night.cycle_duration;
-            println!("⏪ Tiempo retrocedido: {}", get_time_description(day_night.get_time_of_day()));
+            println!("Tiempo retrocedido: {}", get_time_description(day_night.get_time_of_day()));
             needs_render = true;
         }
 
@@ -449,17 +449,17 @@ fn main() {
                 scene_choice = new_scene_num;
                 
                 println!("\n╔════════════════════════════════════════╗");
-                println!("║     🔄 CAMBIANDO DE ESCENA...          ║");
+                println!("║       CAMBIANDO DE ESCENA...           ║");
                 println!("╚════════════════════════════════════════╝\n");
                 
                 let start = std::time::Instant::now();
                 (objects, lights) = load_scene(scene_choice);
                 print_scene_info(scene_choice, objects.len(), lights.len());
                 
-                println!("⚡ Reconstruyendo BVH...");
+                println!("Reconstruyendo BVH...");
                 let bvh_start = std::time::Instant::now();
                 bvh = BVH::build(&objects);
-                println!("✅ BVH reconstruido en {:.3}s", bvh_start.elapsed().as_secs_f32());
+                println!("BVH reconstruido en {:.3}s", bvh_start.elapsed().as_secs_f32());
                 
                 let scene_info = SceneInfo::get(scene_choice);
                 camera = Camera::new(
@@ -468,7 +468,7 @@ fn main() {
                     Vector3::new(0.0, 1.0, 0.0),
                 );
                 
-                println!("⏱️  Tiempo total: {:.3}s\n", start.elapsed().as_secs_f32());
+                println!("Tiempo total: {:.3}s\n", start.elapsed().as_secs_f32());
                 
                 needs_render = true;
                 frame_count = 0;
@@ -508,15 +508,15 @@ fn main() {
                 scene_info.camera_target,
                 Vector3::new(0.0, 1.0, 0.0),
             );
-            println!("📷 Cámara reseteada");
+            println!("Cámara reseteada");
             needs_render = true;
         }
 
         if window.is_key_pressed(KeyboardKey::KEY_E) {
-            println!("📦 Exportando texturas...");
+            println!("Exportando texturas...");
             TEXTURE_MANAGER.lock().unwrap()
                 .export_all_textures("assets/textures_exported");
-            println!("✅ Texturas exportadas a assets/textures_exported/");
+            println!("Texturas exportadas a assets/textures_exported/");
         }
 
         if !paused {
@@ -550,7 +550,7 @@ fn main() {
             if frame_count % 30 == 0 {
                 let avg_time = total_render_time / frame_count as f32;
                 let fps = 1.0 / avg_time;
-                println!("⚡ Frame {}: {:.3}s ({:.1} FPS) | {}", 
+                println!("Frame {}: {:.3}s ({:.1} FPS) | {}", 
                          frame_count, elapsed, fps,
                          get_time_description(day_night.get_time_of_day()));
             }
@@ -560,7 +560,7 @@ fn main() {
     }
 
     println!("\n╔════════════════════════════════════════╗");
-    println!("║         👋 PROGRAMA FINALIZADO         ║");
+    println!("║           PROGRAMA FINALIZADO          ║");
     let final_fps = 1.0 / (total_render_time / frame_count.max(1) as f32);
     println!("║     FPS Promedio: {:.1}              ║", final_fps);
     println!("╚════════════════════════════════════════╝\n");

@@ -13,7 +13,7 @@ import math
 def ensure_directory():
     """Crea el directorio de texturas si no existe"""
     os.makedirs("assets/textures", exist_ok=True)
-    print("✅ Directorio assets/textures/ creado/verificado")
+    print("Directorio assets/textures/ creado/verificado")
 
 def add_noise(color, amount=10):
     """Añade ruido aleatorio a un color"""
@@ -42,7 +42,7 @@ def generate_grass_top():
             pixels[x, y] = color
     
     img.save("assets/textures/grass_top.png")
-    print("✅ grass_top.png")
+    print("grass_top.png")
 
 def generate_grass_side():
     """Genera textura de césped lateral (con tierra abajo)"""
@@ -62,7 +62,7 @@ def generate_grass_side():
             pixels[x, y] = color
     
     img.save("assets/textures/grass_side.png")
-    print("✅ grass_side.png")
+    print("grass_side.png")
 
 def generate_dirt():
     """Genera textura de tierra"""
@@ -81,7 +81,7 @@ def generate_dirt():
             pixels[x, y] = color
     
     img.save("assets/textures/dirt.png")
-    print("✅ dirt.png")
+    print("dirt.png")
 
 def generate_stone():
     """Genera textura de piedra"""
@@ -104,7 +104,7 @@ def generate_stone():
             pixels[x, y] = color
     
     img.save("assets/textures/stone.png")
-    print("✅ stone.png")
+    print("stone.png")
 
 def generate_wood():
     """Genera textura de madera con anillos"""
@@ -130,7 +130,7 @@ def generate_wood():
             pixels[x, y] = color
     
     img.save("assets/textures/wood.png")
-    print("✅ wood.png")
+    print("wood.png")
 
 def generate_leaves():
     """Genera textura de hojas"""
@@ -153,7 +153,7 @@ def generate_leaves():
             pixels[x, y] = color
     
     img.save("assets/textures/leaves.png")
-    print("✅ leaves.png")
+    print("leaves.png")
 
 def generate_water_animated():
     """Genera 4 frames de agua animada"""
@@ -179,7 +179,7 @@ def generate_water_animated():
         
         img.save(f"assets/textures/water_{frame}.png")
     
-    print("✅ water_0.png, water_1.png, water_2.png, water_3.png")
+    print("water_0.png, water_1.png, water_2.png, water_3.png")
 
 def generate_lava_animated():
     """Genera 4 frames de lava animada"""
@@ -211,7 +211,7 @@ def generate_lava_animated():
         
         img.save(f"assets/textures/lava_{frame}.png")
     
-    print("✅ lava_0.png, lava_1.png, lava_2.png, lava_3.png")
+    print("lava_0.png, lava_1.png, lava_2.png, lava_3.png")
 
 def generate_portal_animated():
     """Genera 6 frames de portal animado"""
@@ -250,7 +250,7 @@ def generate_portal_animated():
         
         img.save(f"assets/textures/portal_{frame}.png")
     
-    print("✅ portal_0.png ... portal_5.png")
+    print("portal_0.png ... portal_5.png")
 
 def generate_netherrack():
     """Genera textura de netherrack"""
@@ -271,7 +271,7 @@ def generate_netherrack():
             pixels[x, y] = color
     
     img.save("assets/textures/netherrack.png")
-    print("✅ netherrack.png")
+    print("netherrack.png")
 
 def generate_nether_brick():
     """Genera textura de ladrillos del Nether"""
@@ -290,7 +290,7 @@ def generate_nether_brick():
                 pixels[x, y] = add_noise(brick_color, 10)
     
     img.save("assets/textures/nether_brick.png")
-    print("✅ nether_brick.png")
+    print("nether_brick.png")
 
 def generate_soul_sand():
     """Genera textura de arena de almas"""
@@ -311,7 +311,7 @@ def generate_soul_sand():
             pixels[x, y] = color
     
     img.save("assets/textures/soul_sand.png")
-    print("✅ soul_sand.png")
+    print("soul_sand.png")
 
 def generate_glowstone():
     """Genera textura de piedra luminosa"""
@@ -337,7 +337,7 @@ def generate_glowstone():
             pixels[x, y] = color
     
     img.save("assets/textures/glowstone.png")
-    print("✅ glowstone.png")
+    print("glowstone.png")
 
 def generate_diamond():
     """Genera textura de diamante cristalino"""
@@ -370,7 +370,7 @@ def generate_diamond():
             pixels[x, y] = color
     
     img.save("assets/textures/diamond.png")
-    print("✅ diamond.png")
+    print("diamond.png")
 
 def generate_emerald():
     """Genera textura de esmeralda"""
@@ -402,7 +402,7 @@ def generate_emerald():
             pixels[x, y] = color
     
     img.save("assets/textures/emerald.png")
-    print("✅ emerald.png")
+    print("emerald.png")
 
 def generate_obsidian():
     """Genera textura de obsidiana"""
@@ -431,7 +431,7 @@ def generate_obsidian():
             pixels[x, y] = color
     
     img.save("assets/textures/obsidian.png")
-    print("✅ obsidian.png")
+    print("obsidian.png")
 
 def generate_ice():
     """Genera textura de hielo"""
@@ -456,7 +456,7 @@ def generate_ice():
             pixels[x, y] = color
     
     img.save("assets/textures/ice.png")
-    print("✅ ice.png")
+    print("ice.png")
 
 def generate_brick():
     """Genera textura de ladrillos normales"""
@@ -476,7 +476,7 @@ def generate_brick():
                 pixels[x, y] = add_noise(brick_color, 15)
     
     img.save("assets/textures/brick.png")
-    print("✅ brick.png (bonus)")
+    print("brick.png (bonus)")
 
 def generate_sand():
     """Genera textura de arena"""
@@ -497,19 +497,19 @@ def generate_sand():
             pixels[x, y] = color
     
     img.save("assets/textures/sand.png")
-    print("✅ sand.png (bonus)")
+    print("sand.png (bonus)")
 
 def main():
     """Genera todas las texturas"""
     print("=" * 60)
-    print("🎨 GENERADOR DE TEXTURAS PARA RAY TRACER")
+    print("GENERADOR DE TEXTURAS PARA RAY TRACER")
     print("=" * 60)
     
     ensure_directory()
-    print("\n📦 Generando texturas 16x16...\n")
+    print("\nGenerando texturas 16x16...\n")
     
     # Texturas básicas del Overworld
-    print("🌍 Texturas del Overworld:")
+    print("Texturas del Overworld:")
     generate_grass_top()
     generate_grass_side()
     generate_dirt()
@@ -518,35 +518,35 @@ def main():
     generate_leaves()
     
     # Texturas animadas
-    print("\n🎬 Texturas animadas:")
+    print("\nTexturas animadas:")
     generate_water_animated()
     generate_lava_animated()
     generate_portal_animated()
     
     # Texturas del Nether
-    print("\n🔥 Texturas del Nether:")
+    print("\nTexturas del Nether:")
     generate_netherrack()
     generate_nether_brick()
     generate_soul_sand()
     generate_glowstone()
     
     # Texturas de gemas/materiales especiales
-    print("\n💎 Materiales especiales:")
+    print("\nMateriales especiales:")
     generate_diamond()
     generate_emerald()
     generate_obsidian()
     generate_ice()
     
     # Texturas bonus
-    print("\n🎁 Texturas bonus:")
+    print("\nTexturas bonus:")
     generate_brick()
     generate_sand()
     
     print("\n" + "=" * 60)
-    print("✨ ¡Todas las texturas generadas exitosamente!")
-    print(f"📁 Ubicación: assets/textures/")
-    print(f"📊 Total de archivos: 27 texturas")
-    print("\n💡 Tips:")
+    print("¡Todas las texturas generadas exitosamente!")
+    print(f"Ubicación: assets/textures/")
+    print(f"Total de archivos: 27 texturas")
+    print("\nTips:")
     print("   • Edita los PNG con cualquier editor de imágenes")
     print("   • Las texturas animadas tienen sufijos _0, _1, etc.")
     print("   • El programa Rust las cargará automáticamente")
@@ -557,13 +557,13 @@ if __name__ == "__main__":
         main()
     except ImportError:
         print("=" * 60)
-        print("❌ ERROR: PIL (Pillow) no está instalado")
-        print("\n📦 Instálalo con:")
+        print("ERROR: PIL (Pillow) no está instalado")
+        print("\nInstálalo con:")
         print("   pip install pillow")
         print("\n   o si usas pip3:")
         print("   pip3 install pillow")
         print("=" * 60)
     except Exception as e:
-        print(f"❌ Error inesperado: {e}")
+        print(f"Error inesperado: {e}")
         import traceback
         traceback.print_exc()

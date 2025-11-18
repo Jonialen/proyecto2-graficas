@@ -246,7 +246,7 @@ impl Mesh {
             }
         }
 
-        println!("✅ Malla cargada: {} triángulos desde {}", triangles.len(), path);
+        println!("Malla cargada: {} triángulos desde {}", triangles.len(), path);
         Ok(Mesh { triangles })
     }
 

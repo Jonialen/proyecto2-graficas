@@ -47,7 +47,7 @@ pub fn floating_island_waterfalls() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>
         let top_y = center_y + radius;
         
         if builder.is_position_occupied(wx, top_y - 1, wz) {
-            // ✅ Cambiar a tamaño 1.0 para bloques sólidos conectados
+            // Cambiar a tamaño 1.0 para bloques sólidos conectados
             for h in 0..12 {
                 let y = top_y - h;
                 builder = builder.add_cube(wx as f32, y as f32, wz as f32, 1.0, "water");
@@ -59,7 +59,7 @@ pub fn floating_island_waterfalls() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>
         .add_nether_reflection(center_x, -center_y, center_z, radius)
         .add_nether_features(center_x, -center_y, center_z, radius);
     
-    // ✅ Cascadas de lava en el Nether también con tamaño 1.0
+    // Cascadas de lava en el Nether también con tamaño 1.0
     for (wx, wz) in waterfall_positions {
         let bottom_y = -center_y - radius;
         for h in 0..12 {
@@ -91,9 +91,9 @@ pub fn floating_island_bridge() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Ve
     let bottom_connection = -center_y + radius + 1;
     let bridge_length = top_connection - bottom_connection;
     
-    println!("🌉 Construyendo puente de {} bloques", bridge_length);
+    println!("Construyendo puente de {} bloques", bridge_length);
     
-    // ✅ Puente con bloques de tamaño 1.0
+    // Puente con bloques de tamaño 1.0
     for y in bottom_connection..=top_connection {
         let progress = (y - bottom_connection) as f32 / bridge_length as f32;
         
@@ -132,7 +132,7 @@ pub fn floating_island_bridge() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Ve
         }
     }
     
-    // ✅ Plataformas de conexión con bloques de tamaño 1.0
+    // Plataformas de conexión con bloques de tamaño 1.0
     for dx in -2..=2 {
         for dz in -2..=2 {
             builder = builder
@@ -819,67 +819,67 @@ impl SceneInfo {
     pub fn get(scene_num: i32) -> Self {
         match scene_num {
             1 => SceneInfo {
-                name: "🏝️  Isla Flotante Básica",
+                name: "Isla Flotante Básica",
                 camera_pos: Vector3::new(25.0, 0.0, 25.0),
                 camera_target: Vector3::new(0.0, 0.0, 0.0),
             },
             2 => SceneInfo {
-                name: "💧 Isla con Cascadas",
+                name: "Isla con Cascadas",
                 camera_pos: Vector3::new(25.0, 0.0, 25.0),
                 camera_target: Vector3::new(0.0, 0.0, 0.0),
             },
             3 => SceneInfo {
-                name: "🌉 Isla con Puente Portal",
+                name: "Isla con Puente Portal",
                 camera_pos: Vector3::new(25.0, 0.0, 25.0),
                 camera_target: Vector3::new(0.0, 0.0, 0.0),
             },
             4 => SceneInfo {
-                name: "🏰 Castillo Medieval",
+                name: "Castillo Medieval",
                 camera_pos: Vector3::new(25.0, 15.0, 25.0),
                 camera_target: Vector3::new(0.0, 5.0, 0.0),
             },
             5 => SceneInfo {
-                name: "🏠 Casa con Jardín",
+                name: "Casa con Jardín",
                 camera_pos: Vector3::new(15.0, 8.0, 15.0),
                 camera_target: Vector3::new(0.0, 2.0, 0.0),
             },
             6 => SceneInfo {
-                name: "📦 Escena Simple",
+                name: "Escena Simple",
                 camera_pos: Vector3::new(15.0, 8.0, 15.0),
                 camera_target: Vector3::new(0.0, 2.0, 0.0),
             },
             7 => SceneInfo {
-                name: "🏘️  Aldea Medieval",
+                name: "Aldea Medieval",
                 camera_pos: Vector3::new(35.0, 20.0, 35.0),
                 camera_target: Vector3::new(0.0, 3.0, 0.0),
             },
             8 => SceneInfo {
-                name: "🌲 Bosque Encantado",
+                name: "Bosque Encantado",
                 camera_pos: Vector3::new(40.0, 15.0, 40.0),
                 camera_target: Vector3::new(0.0, 5.0, 0.0),
             },
             9 => SceneInfo {
-                name: "🏝️  Archipiélago Masivo",
+                name: "Archipiélago Masivo",
                 camera_pos: Vector3::new(50.0, 20.0, 50.0),
                 camera_target: Vector3::new(0.0, 10.0, 0.0),
             },
             10 => SceneInfo {
-                name: "🏛️  Templo Antiguo",
+                name: "Templo Antiguo",
                 camera_pos: Vector3::new(30.0, 25.0, 30.0),
                 camera_target: Vector3::new(0.0, 10.0, 0.0),
             },
             11 => SceneInfo {
-                name: "🏔️  Cañón con Río",
+                name: "Cañón con Río",
                 camera_pos: Vector3::new(0.0, 25.0, 40.0),
                 camera_target: Vector3::new(0.0, 5.0, 0.0),
             },
             12 => SceneInfo {
-                name: "🌀 Portal Dimensional",
+                name: "Portal Dimensional",
                 camera_pos: Vector3::new(0.0, 8.0, 25.0),
                 camera_target: Vector3::new(0.0, 5.0, 0.0),
             },            
             _ => SceneInfo {
-                name: "❓ Escena Desconocida",
+                name: "Escena Desconocida",
                 camera_pos: Vector3::new(15.0, 8.0, 15.0),
                 camera_target: Vector3::new(0.0, 2.0, 0.0),
             },

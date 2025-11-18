@@ -37,7 +37,7 @@ impl TextureManager {
         // 2. Intentar cargar desde disco (reemplaza las procedurales si existen)
         manager.load_textures_from_directory("assets/textures");
         
-        // ✅ 3. Exportar las que faltan (NUEVO)
+        // 3. Exportar las que faltan (NUEVO)
         manager.export_missing_textures("assets/textures");
         
         manager
@@ -50,7 +50,7 @@ impl TextureManager {
     pub fn export_missing_textures(&self, dir_path: &str) {
         // Crear el directorio si no existe
         if let Err(e) = std::fs::create_dir_all(dir_path) {
-            println!("⚠️  No se pudo crear directorio {}: {}", dir_path, e);
+            println!("No se pudo crear directorio {}: {}", dir_path, e);
             return;
         }
 
@@ -67,7 +67,7 @@ impl TextureManager {
             }
 
             if self.export_texture_to_file(name, &file_path, texture_data) {
-                println!("💾 Textura exportada: {}", file_path);
+                println!("Textura exportada: {}", file_path);
                 exported_count += 1;
             }
         }
@@ -87,17 +87,17 @@ impl TextureManager {
                     &file_path,
                     frame_data
                 ) {
-                    println!("💾 Frame de animación exportado: {}", file_path);
+                    println!("Frame de animación exportado: {}", file_path);
                     exported_count += 1;
                 }
             }
         }
 
         if exported_count > 0 {
-            println!("✅ {} texturas exportadas a {}", exported_count, dir_path);
+            println!("{} texturas exportadas a {}", exported_count, dir_path);
         }
         if skipped_count > 0 {
-            println!("⏭️  {} texturas ya existían (no sobreescritas)", skipped_count);
+            println!("{} texturas ya existían (no sobreescritas)", skipped_count);
         }
     }
 
@@ -117,13 +117,13 @@ impl TextureManager {
                 match img.save(file_path) {
                     Ok(_) => true,
                     Err(e) => {
-                        println!("❌ Error guardando {}: {}", file_path, e);
+                        println!("Error guardando {}: {}", file_path, e);
                         false
                     }
                 }
             }
             _none => {
-                println!("❌ Error creando imagen para {}", file_path);
+                println!("Error creando imagen para {}", file_path);
                 false
             }
         }
@@ -135,14 +135,14 @@ impl TextureManager {
             return self.export_texture_to_file(name, output_path, texture_data);
         }
 
-        println!("⚠️  Textura '{}' no encontrada", name);
+        println!("Textura '{}' no encontrada", name);
         false
     }
 
     #[allow(dead_code)]
     pub fn export_all_textures(&self, dir_path: &str) -> usize {
         if let Err(e) = std::fs::create_dir_all(dir_path) {
-            println!("❌ No se pudo crear directorio {}: {}", dir_path, e);
+            println!("No se pudo crear directorio {}: {}", dir_path, e);
             return 0;
         }
 
@@ -170,7 +170,7 @@ impl TextureManager {
             }
         }
 
-        println!("✅ {} texturas exportadas (todas) a {}", count, dir_path);
+        println!("{} texturas exportadas (todas) a {}", count, dir_path);
         count
     }
 
@@ -178,7 +178,7 @@ impl TextureManager {
         let path = Path::new(dir_path);
         
         if !path.exists() {
-            println!("📂 Directorio de texturas no existe aún: {}", dir_path);
+            println!("Directorio de texturas no existe aún: {}", dir_path);
             println!("   Se crearán texturas procedurales");
             return;
         }
@@ -216,7 +216,7 @@ impl TextureManager {
         }
 
         if loaded_count > 0 {
-            println!("✅ {} texturas cargadas desde {}", loaded_count, dir_path);
+            println!("{} texturas cargadas desde {}", loaded_count, dir_path);
         }
     }
 
@@ -257,7 +257,7 @@ impl TextureManager {
                 },
             );
 
-            println!("🎬 Textura animada cargada: {} ({} frames)", base_name, frame_idx);
+            println!("Textura animada cargada: {} ({} frames)", base_name, frame_idx);
             true
         } else {
             false
@@ -271,7 +271,7 @@ impl TextureManager {
                 true
             }
             Err(e) => {
-                println!("❌ Error cargando textura {}: {}", file_path, e);
+                println!("Error cargando textura {}: {}", file_path, e);
                 false
             }
         }
@@ -372,7 +372,7 @@ impl TextureManager {
         self.register_procedural("obsidian", size, size, self.generate_obsidian());
         self.register_procedural("ice", size, size, self.generate_ice());
         
-        println!("✨ {} texturas procedurales cargadas", self.textures.len());
+        println!("{} texturas procedurales cargadas", self.textures.len());
     }
 
     pub fn sample(&self, texture_name: &str, u: f32, v: f32) -> Vector3 {
