@@ -1,5 +1,6 @@
 use raylib::prelude::*;
 use std::sync::Arc;
+use std::collections::HashSet;
 use crate::ray_intersect::RayIntersect;
 use crate::light::Light;
 use crate::material::Material;
@@ -10,8 +11,10 @@ pub struct SceneBuilder {
     objects: Vec<Arc<dyn RayIntersect + Send + Sync>>,
     lights: Vec<Light>,
     materials: MaterialLibrary,
+    use_obj_cubes: bool,
+    grass_positions: Vec<(i32, i32, i32)>,
+    occupied_positions: HashSet<(i32, i32, i32)>,
 }
-
 struct MaterialLibrary {
     materials: std::collections::HashMap<String, Material>,
 }
@@ -41,10 +44,7 @@ impl MaterialLibrary {
     }
     
     fn get(&self, name: &str) -> Material {
-        self.materials.get(name).cloned().unwrap_or_else(|| {
-            println!("⚠️  Material '{}' no encontrado, usando stone", name);
-            Self::stone()
-        })
+        self.materials.get(name).cloned().unwrap_or_else(|| Self::stone())
     }
     
     fn grass_top() -> Material {
@@ -97,34 +97,73 @@ impl MaterialLibrary {
     }
 }
 
+
 impl SceneBuilder {
     pub fn new() -> Self {
         SceneBuilder {
             objects: Vec::new(),
             lights: Vec::new(),
             materials: MaterialLibrary::new(),
+            use_obj_cubes: false,
+            grass_positions: Vec::new(),
+            occupied_positions: HashSet::new(),
         }
+    }
+    
+    pub fn use_obj_models(mut self, use_obj: bool) -> Self {
+        self.use_obj_cubes = use_obj;
+        self
+    }
+
+    pub fn is_position_occupied(&self, x: i32, y: i32, z: i32) -> bool {
+        self.occupied_positions.contains(&(x, y, z))
+    }
+
+    fn mark_position(&mut self, x: i32, y: i32, z: i32) {
+        self.occupied_positions.insert((x, y, z));
     }
     
     pub fn add_cube(mut self, x: f32, y: f32, z: f32, size: f32, material: &str) -> Self {
-        let mat = self.materials.get(material);
-        self.objects.push(Arc::new(Cube::new(Vector3::new(x, y, z), size, mat)));
-        self
-    }
-    
-    pub fn add_cubes(mut self, positions: &[(f32, f32, f32)], size: f32, material: &str) -> Self {
-        let mat = self.materials.get(material);
-        for (x, y, z) in positions {
-            self.objects.push(Arc::new(Cube::new(Vector3::new(*x, *y, *z), size, mat.clone())));
+        let xi = x as i32;
+        let yi = y as i32;
+        let zi = z as i32;
+        
+        // Verificar si ya existe un bloque aquí
+        if self.is_position_occupied(xi, yi, zi) {
+            return self;
         }
+        
+        let mat = self.materials.get(material);
+        
+        if self.use_obj_cubes {
+            match Mesh::from_obj("assets/cube.obj", &mat, Vector3::new(x, y, z), size) {
+                Ok(mesh) => {
+                    self.objects.extend(mesh.to_objects());
+                }
+                Err(e) => {
+                    println!("  Error cargando cube.obj: {}. Usando cubo procedural.", e);
+                    self.objects.push(Arc::new(Cube::new(Vector3::new(x, y, z), size, mat)));
+                }
+            }
+        } else {
+            self.objects.push(Arc::new(Cube::new(Vector3::new(x, y, z), size, mat)));
+        }
+        
+        // Marcar posición como ocupada
+        self.mark_position(xi, yi, zi);
+        
         self
     }
-    
+
     pub fn add_floor(mut self, radius: i32, material: &str) -> Self {
         let mat = self.materials.get(material);
         for x in -radius..=radius {
             for z in -radius..=radius {
-                self.objects.push(Arc::new(Cube::new(Vector3::new(x as f32, 0.0, z as f32), 1.0, mat.clone())));
+                self.objects.push(Arc::new(Cube::new(
+                    Vector3::new(x as f32, 0.0, z as f32), 
+                    1.0, 
+                    mat.clone()
+                )));
             }
         }
         self
@@ -199,8 +238,7 @@ impl SceneBuilder {
             Ok(mesh) => {
                 self.objects.extend(mesh.to_objects());
             }
-            Err(e) => {
-                println!("Error cargando {}: {}", path, e);
+            Err(_) => {
                 self.objects.push(Arc::new(Cube::new(Vector3::new(x, y, z), scale, mat)));
             }
         }
@@ -232,15 +270,17 @@ impl SceneBuilder {
         self
     }
     
-    pub fn add_tree(mut self, x: i32, z: i32) -> Self {
-        for y in 0..5 {
-            self = self.add_cube(x as f32, y as f32, z as f32, 1.0, "wood");
+    pub fn add_tree(mut self, x: i32, y: i32, z: i32) -> Self {
+        // Tronco del árbol (5 bloques de altura desde Y)
+        for dy in 0..5 {
+            self = self.add_cube(x as f32, (y + dy) as f32, z as f32, 1.0, "wood");
         }
         
+        // Hojas (relativas a Y)
         let leaf_positions = [
-            (x, 4, z-1), (x, 4, z+1), (x-1, 4, z), (x+1, 4, z),
-            (x, 5, z-1), (x, 5, z+1), (x-1, 5, z), (x+1, 5, z),
-            (x, 5, z), (x, 6, z),
+            (x, y + 4, z-1), (x, y + 4, z+1), (x-1, y + 4, z), (x+1, y + 4, z),
+            (x, y + 5, z-1), (x, y + 5, z+1), (x-1, y + 5, z), (x+1, y + 5, z),
+            (x, y + 5, z), (x, y + 6, z),
         ];
         
         for (lx, ly, lz) in leaf_positions {
@@ -265,16 +305,13 @@ impl SceneBuilder {
         self
     }
     
-    // === ISLA FLOTANTE ===
-    
     pub fn add_floating_island(mut self, center_x: i32, center_y: i32, center_z: i32, radius: i32) -> Self {
-        println!("   🏝️  Generando isla de radio {}...", radius);
         let cx = center_x as f32;
         let cy = center_y as f32;
         let cz = center_z as f32;
         let r = radius as f32;
         
-        let mut block_count = 0;
+        self.grass_positions.clear();
         
         for y in -radius..=radius {
             for x in -radius..=radius {
@@ -283,21 +320,21 @@ impl SceneBuilder {
                     let fy = y as f32;
                     let fz = z as f32;
                     
-                    // Función de densidad mejorada para forma más orgánica
                     let dist = ((fx * fx + fy * fy * 1.5 + fz * fz).sqrt()) / r;
                     let density = (1.0 - dist) + (fy / r) * 0.3;
-                    
-                    // Ruido más pronunciado
                     let noise = ((fx * 0.3 + fz * 0.5).sin() * (fy * 0.4).cos()) * 0.2;
                     
-                    // Threshold más bajo para isla más grande
                     if density + noise > 0.2 {
                         let wx = cx + fx;
                         let wy = cy + fy;
                         let wz = cz + fz;
                         
-                        // Determinar material por altura relativa
                         let material = if fy > radius as f32 * 0.5 {
+                            self.grass_positions.push((
+                                wx as i32,
+                                wy as i32,
+                                wz as i32
+                            ));
                             "grass_top"
                         } else if fy > radius as f32 * 0.0 {
                             "dirt"
@@ -306,24 +343,118 @@ impl SceneBuilder {
                         };
                         
                         self = self.add_cube(wx, wy, wz, 1.0, material);
-                        block_count += 1;
                     }
                 }
             }
         }
         
-        println!("   ✅ {} bloques de isla generados", block_count);
+        self
+    }
+
+    /// Genera un lago orgánico en la superficie de la isla
+    pub fn add_organic_lake(
+        mut self,
+        center_x: i32,
+        center_z: i32,
+        radius: i32,
+        depth: i32,
+    ) -> Self {
+        use std::collections::HashMap;
+        
+        // 1. Encontrar superficie (bloques de grass más altos)
+        let mut surface_map: HashMap<(i32, i32), i32> = HashMap::new();
+        for (x, y, z) in &self.grass_positions {
+            surface_map
+                .entry((*x, *z))
+                .and_modify(|max_y| *max_y = (*max_y).max(*y))
+                .or_insert(*y);
+        }
+        
+        // 2. Generar forma orgánica del lago
+        let mut lake_positions = Vec::new();
+        
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                let x = center_x + dx;
+                let z = center_z + dz;
+                
+                // Verificar si hay superficie aquí
+                if let Some(&surface_y) = surface_map.get(&(x, z)) {
+                    // Usar múltiples octavas de ruido para forma orgánica
+                    let noise1 = ((dx as f32 * 0.3).sin() * (dz as f32 * 0.3).cos()) * 0.5;
+                    let noise2 = ((dx as f32 * 0.7 + dz as f32 * 0.5).sin()) * 0.3;
+                    let noise3 = ((dx as f32 * 1.2).cos() * (dz as f32 * 0.9).sin()) * 0.2;
+                    
+                    let dist = ((dx * dx + dz * dz) as f32).sqrt();
+                    let threshold = radius as f32 * (0.8 + noise1 + noise2 + noise3);
+                    
+                    if dist < threshold {
+                        lake_positions.push((x, surface_y, z));
+                    }
+                }
+            }
+        }
+        
+        let lake_size = lake_positions.len(); // Guardar tamaño antes del loop
+        
+        // 3. Excavar el lago y llenar con agua
+        for &(x, surface_y, z) in &lake_positions {  // ✅ Usar referencia
+            // Remover bloques de tierra/grass
+            for dy in 0..=depth {
+                let y = surface_y - dy;
+                
+                // Remover de occupied_positions para poder reemplazar
+                self.occupied_positions.remove(&(x, y, z));
+                
+                // Agua en el fondo, aire arriba
+                if dy == depth {
+                    self = self.add_cube(x as f32, y as f32, z as f32, 1.0, "water");
+                }
+                // Los otros bloques simplemente se remueven (quedan como aire)
+            }
+        }
+        
+        println!("💧 Lago generado con {} bloques de agua", lake_size);
+        
+        self
+    }
+    
+    /// Genera un lago de lava en el Nether
+    pub fn add_lava_lake(
+        mut self,
+        center_x: i32,
+        center_y: i32,
+        center_z: i32,
+        radius: i32,
+    ) -> Self {
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                let x = center_x + dx;
+                let z = center_z + dz;
+                
+                // Forma orgánica
+                let noise = ((dx as f32 * 0.4).sin() * (dz as f32 * 0.4).cos()) * 0.4;
+                let dist = ((dx * dx + dz * dz) as f32).sqrt();
+                let threshold = radius as f32 * (0.85 + noise);
+                
+                if dist < threshold {
+                    // Solo colocar lava si hay soporte debajo (no flotando)
+                    if self.is_position_occupied(x, center_y - 1, z) {
+                        self.occupied_positions.remove(&(x, center_y, z));
+                        self = self.add_cube(x as f32, center_y as f32, z as f32, 1.0, "lava");
+                    }
+                }
+            }
+        }
+        
         self
     }
     
     pub fn add_nether_reflection(mut self, center_x: i32, center_y: i32, center_z: i32, radius: i32) -> Self {
-        println!("   🔥 Generando reflejo Nether...");
         let cx = center_x as f32;
         let cy = center_y as f32;
         let cz = center_z as f32;
         let r = radius as f32;
-        
-        let mut block_count = 0;
         
         for y in -radius..=radius {
             for x in -radius..=radius {
@@ -338,11 +469,9 @@ impl SceneBuilder {
                     
                     if density + noise > 0.2 {
                         let wx = cx + fx;
-                        // INVERTIR Y para reflejo
                         let wy = cy - fy;
                         let wz = cz + fz;
                         
-                        // Materiales invertidos también
                         let material = if fy < -radius as f32 * 0.5 {
                             "soul_sand"
                         } else if fy < -radius as f32 * 0.0 {
@@ -352,56 +481,63 @@ impl SceneBuilder {
                         };
                         
                         self = self.add_cube(wx, wy, wz, 1.0, material);
-                        block_count += 1;
                     }
                 }
             }
         }
         
-        println!("   ✅ {} bloques de Nether generados", block_count);
         self
     }
     
-    pub fn add_island_vegetation(mut self, center_x: i32, center_y: i32, center_z: i32, radius: i32) -> Self {
-        println!("   🌲 Añadiendo vegetación...");
+    pub fn add_island_vegetation_auto(
+        mut self, 
+        center_x: i32, 
+        center_z: i32, 
+        density: f32
+    ) -> Self {
+        use std::collections::HashMap;
         
-        // Árboles en la superficie (ajustar Y al tope de la isla)
-        let top_y = center_y + radius;
+        let mut grass_map: HashMap<(i32, i32), i32> = HashMap::new();
         
-        let tree_positions = [
-            (center_x - 3, top_y, center_z - 3),
-            (center_x + 4, top_y, center_z - 2),
-            (center_x - 2, top_y, center_z + 4),
-            (center_x + 3, top_y, center_z + 3),
-        ];
-        
-        for (x, _y, z) in tree_positions {
-            self = self.add_tree(x, z);
+        for (x, y, z) in &self.grass_positions {
+            grass_map
+                .entry((*x, *z))
+                .and_modify(|max_y| *max_y = (*max_y).max(*y))
+                .or_insert(*y);
         }
         
-        println!("   ✅ {} árboles plantados", tree_positions.len());
-        self
-    }
-    
-    pub fn add_nether_features(mut self, center_x: i32, center_y: i32, center_z: i32, radius: i32) -> Self {
-        println!("   💀 Añadiendo características del Nether...");
-        let bottom_y = center_y - radius;
+        let mut tree_count = 0;
         
-        // Lagos de lava en la superficie invertida
-        let lava_positions = [
-            (center_x - 2, bottom_y - 2, center_z - 2),
-            (center_x + 3, bottom_y - 2, center_z + 2),
-        ];
-        
-        let mut lava_count = 0;
-        for (x, y, z) in lava_positions {
-            for dx in 0..2 {
-                for dz in 0..2 {
-                    self = self.add_cube((x + dx) as f32, y as f32, (z + dz) as f32, 1.0, "lava");
-                    lava_count += 1;
-                }
+        for ((x, z), grass_y) in grass_map {
+            let hash = ((x * 73856093) ^ (z * 19349663)) as f32;
+            let random = (hash.abs() % 1000.0) / 1000.0;
+            
+            let dx = (x - center_x) as f32;
+            let dz = (z - center_z) as f32;
+            let dist_to_center = dx * dx + dz * dz;
+            let min_dist_sq = 4.0_f32;
+            
+            // Verificar que no haya agua en esta posición
+            let has_water = self.is_position_occupied(x, grass_y + 1, z);
+            
+            if random < density && dist_to_center > min_dist_sq && !has_water {
+                self = self.add_tree(x, grass_y + 1, z);
+                tree_count += 1;
             }
         }
+        
+        println!("🌳 Generados {} árboles", tree_count);
+        
+        self
+    }
+    
+    // Actualizar add_nether_features para usar lagos orgánicos
+    pub fn add_nether_features(mut self, center_x: i32, center_y: i32, center_z: i32, radius: i32) -> Self {
+        let bottom_y = center_y - radius;
+        
+        // Lagos de lava orgánicos
+        self = self.add_lava_lake(center_x - 3, bottom_y - 1, center_z - 3, 2);
+        self = self.add_lava_lake(center_x + 4, bottom_y - 1, center_z + 4, 3);
         
         // Pilares de glowstone
         let pillar_positions = [
@@ -411,11 +547,13 @@ impl SceneBuilder {
         
         for (x, z) in pillar_positions {
             for h in 0..3 {
-                self = self.add_cube(x as f32, (bottom_y - h - 3) as f32, z as f32, 0.5, "glowstone");
+                let y = bottom_y - h - 3;
+                if !self.is_position_occupied(x, y, z) {
+                    self = self.add_cube(x as f32, y as f32, z as f32, 0.5, "glowstone");
+                }
             }
         }
         
-        println!("   ✅ {} bloques de lava y pilares añadidos", lava_count);
         self
     }
     
@@ -429,7 +567,6 @@ impl SceneBuilder {
     }
     
     pub fn build(self) -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-        println!("🏗️  Escena: {} objetos, {} luces", self.objects.len(), self.lights.len());
         (self.objects, self.lights)
     }
 }
@@ -445,78 +582,4 @@ impl Default for SceneBuilder {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// === ESCENAS PREDEFINIDAS ===
-
-pub fn create_floating_island_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    let center_x = 0;
-    let center_y = 10;
-    let center_z = 0;
-    let radius = 6;
-    
-    println!("🏝️  Construyendo escena completa...");
-    
-    let builder = SceneBuilder::new()
-        .add_floating_island(center_x, center_y, center_z, radius)
-        .add_island_vegetation(center_x, center_y, center_z, radius)
-        .add_nether_reflection(center_x, -center_y, center_z, radius)
-        .add_nether_features(center_x, -center_y, center_z, radius)
-        .add_checkered_floor(3, "glass", "stone")
-        .add_dual_world_lighting(center_x as f32, center_z as f32);
-    
-    println!("📦 Finalizando construcción...");
-    builder.build()
-}
-
-pub fn create_floating_island_with_waterfalls() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    let center_x = 0;
-    let center_y = 12;
-    let center_z = 0;
-    let radius = 7;
-    
-    let mut builder = SceneBuilder::new()
-        .add_floating_island(center_x, center_y, center_z, radius)
-        .add_island_vegetation(center_x, center_y, center_z, radius);
-    
-    for i in 0..6 {
-        let angle = (i as f32) * std::f32::consts::PI / 3.0;
-        let x = center_x as f32 + (radius as f32 * 0.8) * angle.cos();
-        let z = center_z as f32 + (radius as f32 * 0.8) * angle.sin();
-        
-        for h in 0..10 {
-            builder = builder.add_cube(x, (center_y + radius - h * 2) as f32, z, 0.3, "water");
-        }
-    }
-    
-    builder
-        .add_nether_reflection(center_x, -center_y, center_z, radius)
-        .add_nether_features(center_x, -center_y, center_z, radius)
-        .add_dual_world_lighting(center_x as f32, center_z as f32)
-        .build()
-}
-
-pub fn create_floating_island_with_bridge() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    let center_x = 0;
-    let center_y = 10;
-    let center_z = 0;
-    let radius = 6;
-    
-    let mut builder = SceneBuilder::new()
-        .add_floating_island(center_x, center_y, center_z, radius)
-        .add_island_vegetation(center_x, center_y, center_z, radius)
-        .add_nether_reflection(center_x, -center_y, center_z, radius)
-        .add_nether_features(center_x, -center_y, center_z, radius);
-    
-    for y in (-center_y + radius)..(center_y - radius) {
-        builder = builder
-            .add_cube(center_x as f32 - 1.0, y as f32, center_z as f32, 0.3, "glass")
-            .add_cube(center_x as f32 + 1.0, y as f32, center_z as f32, 0.3, "glass");
-        
-        if y % 2 == 0 {
-            builder = builder.add_cube(center_x as f32, y as f32, center_z as f32, 0.2, "glowstone");
-        }
-    }
-    
-    builder.add_dual_world_lighting(center_x as f32, center_z as f32).build()
 }

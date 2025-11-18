@@ -19,7 +19,7 @@ use camera::Camera;
 use light::Light;
 use material::{Material, vector3_to_color};
 use texture::TextureManager;
-use crate::scene_builder::{SceneBuilder, WallDirection};
+use scene_builder::{SceneBuilder, WallDirection};
 
 const ORIGIN_BIAS: f32 = 1e-4;
 const MAX_DEPTH: u32 = 2;
@@ -28,30 +28,235 @@ lazy_static::lazy_static! {
     static ref TEXTURE_MANAGER: Arc<TextureManager> = Arc::new(TextureManager::new());
 }
 
-// === ESCENAS PREDEFINIDAS ===
-
-fn create_simple_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+/// Escena básica con islas flotantes y lagos orgánicos
+fn create_floating_island_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let center_x = 0;
+    let center_y = 12;
+    let center_z = 0;
+    let radius = 10;
+    
     SceneBuilder::new()
-        .add_floor(10, "grass_top")
-        .add_cube(0.0, 1.0, 0.0, 2.0, "stone")
-        .add_sun(10.0, 15.0, 10.0, 3.0)
+        .use_obj_models(false)
+        
+        // Isla superior
+        .add_floating_island(center_x, center_y, center_z, radius)
+        .add_organic_lake(center_x - 2, center_z + 2, 2, 1)  // Lago pequeño
+        .add_organic_lake(center_x + 3, center_z - 2, 3, 2)  // Lago grande
+        .add_island_vegetation_auto(center_x, center_z, 0.08)
+        
+        // Reflejo Nether
+        .add_nether_reflection(center_x, -center_y, center_z, radius)
+        .add_nether_features(center_x, -center_y, center_z, radius)
+        
+        // Iluminación
+        .add_dual_world_lighting(center_x as f32, center_z as f32)
         .build()
 }
 
-fn create_house_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    SceneBuilder::new()
-        .add_checkered_floor(10, "grass_top", "dirt")
-        .add_house(0, 0)
-        .add_tree(-5, -5)
-        .add_tree(-5, 5)
-        .add_tree(8, -5)
-        .add_tree(8, 5)
-        .add_sun(15.0, 20.0, 15.0, 3.5)
+/// Escena con cascadas que caen desde el borde real de la isla
+fn create_floating_island_with_waterfalls() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let center_x = 0;
+    let center_y = 14;
+    let center_z = 0;
+    let radius = 8;
+    
+    let mut builder = SceneBuilder::new()
+        .use_obj_models(true)
+        
+        // Generar isla
+        .add_floating_island(center_x, center_y, center_z, radius)
+        
+        // Lagos en la cima (las cascadas vendrán de estos lagos)
+        .add_organic_lake(center_x - 3, center_z, 2, 1)
+        .add_organic_lake(center_x + 3, center_z, 2, 1)
+        
+        .add_island_vegetation_auto(center_x, center_z, 0.06);
+    
+    // Generar cascadas que caen desde posiciones lógicas
+    let waterfall_positions = [
+        (center_x - 5, center_z),      // Oeste
+        (center_x + 5, center_z),      // Este
+        (center_x, center_z - 5),      // Norte
+        (center_x, center_z + 5),      // Sur
+    ];
+    
+    for (wx, wz) in waterfall_positions {
+        let top_y = center_y + radius;
+        
+        // Verificar que hay isla en esta posición
+        if builder.is_position_occupied(wx, top_y - 1, wz) {
+            // Cascada de agua desde la isla hacia abajo
+            for h in 0..12 {
+                let y = top_y - h;
+                builder = builder.add_cube(
+                    wx as f32, 
+                    y as f32, 
+                    wz as f32, 
+                    0.5, 
+                    "water"
+                );
+            }
+        }
+    }
+    
+    // Reflejo Nether con cascadas de lava invertidas
+    builder = builder
+        .add_nether_reflection(center_x, -center_y, center_z, radius)
+        .add_nether_features(center_x, -center_y, center_z, radius);
+    
+    for (wx, wz) in waterfall_positions {
+        let bottom_y = -center_y - radius;
+        
+        // Cascadas de lava hacia arriba
+        for h in 0..12 {
+            let y = bottom_y + h;
+            builder = builder.add_cube(
+                wx as f32, 
+                y as f32, 
+                wz as f32, 
+                0.5, 
+                "lava"
+            );
+        }
+    }
+    
+    builder
+        .add_dual_world_lighting(center_x as f32, center_z as f32)
+        .build()
+}
+
+/// Escena con puente conectando dos mundos
+fn create_floating_island_with_bridge() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let center_x = 0;
+    let center_y = 12;
+    let center_z = 0;
+    let radius = 7;
+    
+    let mut builder = SceneBuilder::new()
+        .use_obj_models(true)
+        
+        // Isla superior
+        .add_floating_island(center_x, center_y, center_z, radius)
+        .add_organic_lake(center_x, center_z, 2, 1)
+        .add_island_vegetation_auto(center_x, center_z, 0.06)
+        
+        // Isla inferior (Nether)
+        .add_nether_reflection(center_x, -center_y, center_z, radius)
+        .add_nether_features(center_x, -center_y, center_z, radius);
+    
+    // Calcular puntos de conexión del puente
+    let top_connection = center_y - radius - 1;
+    let bottom_connection = -center_y + radius + 1;
+    let bridge_length = top_connection - bottom_connection;
+    
+    println!("🌉 Construyendo puente de {} bloques", bridge_length);
+    
+    // Puente principal (pilares de vidrio)
+    for y in bottom_connection..=top_connection {
+        let progress = (y - bottom_connection) as f32 / bridge_length as f32;
+        
+        // Pilares laterales
+        builder = builder
+            .add_cube(center_x as f32 - 1.0, y as f32, center_z as f32, 0.4, "glass")
+            .add_cube(center_x as f32 + 1.0, y as f32, center_z as f32, 0.4, "glass");
+        
+        // Piso del puente (cada 2 bloques)
+        if y % 2 == 0 {
+            builder = builder
+                .add_cube(center_x as f32 - 0.5, y as f32, center_z as f32, 0.3, "stone")
+                .add_cube(center_x as f32 + 0.5, y as f32, center_z as f32, 0.3, "stone");
+        }
+        
+        // Luces en espiral (glowstone)
+        if y % 4 == 0 {
+            let angle = progress * std::f32::consts::PI * 4.0;
+            let light_x = center_x as f32 + angle.cos() * 1.5;
+            let light_z = center_z as f32 + angle.sin() * 1.5;
+            
+            builder = builder.add_cube(light_x, y as f32, light_z, 0.3, "glowstone");
+        }
+        
+        // Refuerzos estructurales (cada 5 bloques)
+        if y % 5 == 0 {
+            builder = builder
+                .add_cube(center_x as f32 - 1.0, y as f32, center_z as f32 - 1.0, 0.3, "stone")
+                .add_cube(center_x as f32 + 1.0, y as f32, center_z as f32 - 1.0, 0.3, "stone")
+                .add_cube(center_x as f32 - 1.0, y as f32, center_z as f32 + 1.0, 0.3, "stone")
+                .add_cube(center_x as f32 + 1.0, y as f32, center_z as f32 + 1.0, 0.3, "stone");
+        }
+    }
+    
+    // Plataformas de entrada/salida
+    for dx in -2..=2 {
+        for dz in -2..=2 {
+            // Plataforma superior
+            builder = builder.add_cube(
+                (center_x + dx) as f32,
+                top_connection as f32,
+                (center_z + dz) as f32,
+                1.0,
+                "stone"
+            );
+            
+            // Plataforma inferior
+            builder = builder.add_cube(
+                (center_x + dx) as f32,
+                bottom_connection as f32,
+                (center_z + dz) as f32,
+                1.0,
+                "nether_brick"
+            );
+        }
+    }
+    
+    builder
+        .add_dual_world_lighting(center_x as f32, center_z as f32)
+        .build()
+}
+
+/// Escena con múltiples islas pequeñas conectadas
+fn create_archipelago_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let mut builder = SceneBuilder::new()
+        .use_obj_models(true);
+    
+    // Isla central grande
+    builder = builder
+        .add_floating_island(0, 12, 0, 6)
+        .add_organic_lake(0, 0, 2, 1)
+        .add_island_vegetation_auto(0, 0, 0.1);
+    
+    // Islas satélite pequeñas
+    let satellite_positions = [
+        (12, 10, 8),
+        (-10, 14, -6),
+        (8, 11, -10),
+        (-12, 13, 10),
+    ];
+    
+    for (x, y, z) in satellite_positions {
+        builder = builder
+            .add_floating_island(x, y, z, 3)
+            .add_island_vegetation_auto(x, z, 0.15);
+    }
+    
+    // Reflejos Nether
+    builder = builder
+        .add_nether_reflection(0, -12, 0, 6);
+    
+    for (x, y, z) in satellite_positions {
+        builder = builder
+            .add_nether_reflection(x, -y, z, 3)
+            .add_lava_lake(x, -y - 3, z, 2);
+    }
+    
+    builder
+        .add_dual_world_lighting(0.0, 0.0)
         .build()
 }
 
 fn create_castle_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
     SceneBuilder::new()
+        .use_obj_models(true) // ⚡ ACTIVAR USO DE OBJ
         .add_floor(20, "stone")
         .add_tower(-10, -10, 8, "stone")
         .add_tower(-10, 10, 8, "stone")
@@ -70,86 +275,26 @@ fn create_castle_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light
         .build()
 }
 
-// === ESCENAS DE ISLA FLOTANTE ===
-
-fn create_floating_island_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    println!("🏝️  Generando isla flotante básica...");
-    let center_x = 0;
-    let center_y = 10;
-    let center_z = 0;
-    let radius = 6;
-    
+fn create_house_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
     SceneBuilder::new()
-        .add_floating_island(center_x, center_y, center_z, radius)
-        .add_island_vegetation(center_x, center_y, center_z, radius)
-        .add_nether_reflection(center_x, -center_y, center_z, radius)
-        .add_nether_features(center_x, -center_y, center_z, radius)
-        .add_checkered_floor(3, "glass", "stone")
-        .add_dual_world_lighting(center_x as f32, center_z as f32)
+        .use_obj_models(true) // ⚡ ACTIVAR USO DE OBJ
+        .add_checkered_floor(10, "grass_top", "dirt")
+        .add_house(0, 0)
+        .add_tree(-5, 0,-5)
+        .add_tree(-5,0 ,5)
+        .add_tree(8, 0, -5)
+        .add_tree(8, 0, 5)
+        .add_sun(15.0, 20.0, 15.0, 3.5)
         .build()
 }
 
-fn create_floating_island_with_waterfalls() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    println!("🏝️  Generando isla flotante con cascadas...");
-    let center_x = 0;
-    let center_y = 12;
-    let center_z = 0;
-    let radius = 7;
-    
-    let mut builder = SceneBuilder::new();
-    
-    builder = builder.add_floating_island(center_x, center_y, center_z, radius);
-    builder = builder.add_island_vegetation(center_x, center_y, center_z, radius);
-    
-    println!("   💧 Añadiendo cascadas...");
-    // Cascadas de agua cayendo desde los bordes
-    for i in 0..6 {
-        let angle = (i as f32) * std::f32::consts::PI / 3.0;
-        let x = center_x as f32 + (radius as f32 * 0.8) * angle.cos();
-        let z = center_z as f32 + (radius as f32 * 0.8) * angle.sin();
-        
-        for h in 0..10 {
-            builder = builder.add_cube(x, (center_y + radius - h * 2) as f32, z, 0.3, "water");
-        }
-    }
-    
-    builder = builder.add_nether_reflection(center_x, -center_y, center_z, radius);
-    builder = builder.add_nether_features(center_x, -center_y, center_z, radius);
-    builder = builder.add_dual_world_lighting(center_x as f32, center_z as f32);
-    
-    builder.build()
-}
-
-fn create_floating_island_with_bridge() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
-    println!("🏝️  Generando isla flotante con puente portal...");
-    let center_x = 0;
-    let center_y = 10;
-    let center_z = 0;
-    let radius = 6;
-    
-    let mut builder = SceneBuilder::new();
-    
-    builder = builder.add_floating_island(center_x, center_y, center_z, radius);
-    builder = builder.add_island_vegetation(center_x, center_y, center_z, radius);
-    builder = builder.add_nether_reflection(center_x, -center_y, center_z, radius);
-    builder = builder.add_nether_features(center_x, -center_y, center_z, radius);
-    
-    // Puente vertical conectando ambos mundos (portal)
-    println!("   🌉 Construyendo puente portal...");
-    for y in (-center_y + radius)..(center_y - radius) {
-        builder = builder
-            .add_cube(center_x as f32 - 1.0, y as f32, center_z as f32, 0.3, "glass")
-            .add_cube(center_x as f32 + 1.0, y as f32, center_z as f32, 0.3, "glass");
-        
-        // Partículas de portal cada 2 bloques
-        if y % 2 == 0 {
-            builder = builder.add_cube(center_x as f32, y as f32, center_z as f32, 0.2, "glowstone");
-        }
-    }
-    
-    builder = builder.add_dual_world_lighting(center_x as f32, center_z as f32);
-    
-    builder.build()
+fn create_simple_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    SceneBuilder::new()
+        .use_obj_models(true) // ⚡ ACTIVAR USO DE OBJ
+        .add_floor(10, "grass_top")
+        .add_cube(0.0, 1.0, 0.0, 2.0, "stone")
+        .add_sun(10.0, 15.0, 10.0, 3.0)
+        .build()
 }
 
 fn sky_color(dir: Vector3, is_nether: bool) -> Vector3 {
@@ -309,7 +454,7 @@ pub fn render(
     let width = framebuffer.width as usize;
     let height = framebuffer.height as usize;
     let aspect_ratio = width as f32 / height as f32;
-    let fov = PI / 2.0; // 90 grados - FOV más amplio para ver más escena
+    let fov = PI / 2.0;
     let perspective_scale = (fov * 0.5).tan();
 
     let pixels: Vec<Color> = (0..height)
@@ -358,111 +503,116 @@ fn main() {
     println!("\n╔════════════════════════════════════════╗");
     println!("║   🏝️  RAY TRACER - ISLA FLOTANTE  🏝️   ║");
     println!("╚════════════════════════════════════════╝\n");
-
-    println!("📦 Selecciona tu escena:\n");
-    println!("1. 🏝️  Isla Flotante Básica");
-    println!("2. 💧 Isla con Cascadas");
-    println!("3. 🌉 Isla con Puente Portal");
-    println!("4. 🏰 Castillo");
-    println!("5. 🏠 Casa con Jardín");
-    println!("6. 📦 Escena Simple\n");
-
-    // CAMBIA ESTE NÚMERO PARA ELEGIR LA ESCENA
-    let scene_choice = 4;
-
-    let start = std::time::Instant::now();
     
-    let (objects, lights) = match scene_choice {
-        1 => create_floating_island_scene(),
-        2 => create_floating_island_with_waterfalls(),
-        3 => create_floating_island_with_bridge(),
-        4 => create_castle_scene(),
-        5 => create_house_scene(),
-        _ => create_simple_scene(),
-    };
+    println!("📦 ESCENAS DISPONIBLES:");
+    println!("┌────────────────────────────────────────┐");
+    println!("│ [1] 🏝️  Isla Flotante Básica          │");
+    println!("│ [2] 💧 Isla con Cascadas               │");
+    println!("│ [3] 🌉 Isla con Puente Portal          │");
+    println!("│ [4] 🏰 Castillo Medieval               │");
+    println!("│ [5] 🏠 Casa con Jardín                 │");
+    println!("│ [6] 📦 Escena Simple                   │");
+    println!("└────────────────────────────────────────┘\n");
+
+    let mut scene_choice = 1;
     
-    println!("\n⚡ Construyendo BVH para {} objetos...", objects.len());
+    // Cargar escena inicial
+    let (mut objects, mut lights) = load_scene(scene_choice);
+    print_scene_info(scene_choice, objects.len(), lights.len());
+    
+    let mut camera = get_camera_for_scene(scene_choice);
+    
+    println!("⚡ Construyendo BVH...");
     let bvh_start = std::time::Instant::now();
-    let bvh = BVH::build(&objects);
-    println!("✅ BVH construido en {:.3}s", bvh_start.elapsed().as_secs_f32());
-    
-    // Debug: mostrar bounds de la escena
-    if !objects.is_empty() {
-        let first_bounds = objects[0].get_bounds();
-        let mut min = first_bounds.min;
-        let mut max = first_bounds.max;
-        
-        for obj in &objects[1..] {
-            let bounds = obj.get_bounds();
-            min.x = min.x.min(bounds.min.x);
-            min.y = min.y.min(bounds.min.y);
-            min.z = min.z.min(bounds.min.z);
-            max.x = max.x.max(bounds.max.x);
-            max.y = max.y.max(bounds.max.y);
-            max.z = max.z.max(bounds.max.z);
-        }
-        
-        println!("📊 Bounds de la escena:");
-        println!("   Min: ({:.1}, {:.1}, {:.1})", min.x, min.y, min.z);
-        println!("   Max: ({:.1}, {:.1}, {:.1})", max.x, max.y, max.z);
-        println!("   Centro aprox: ({:.1}, {:.1}, {:.1})", 
-                 (min.x + max.x) / 2.0,
-                 (min.y + max.y) / 2.0,
-                 (min.z + max.z) / 2.0);
-    }
-    
-    println!("📊 Tiempo total de carga: {:.3}s\n", start.elapsed().as_secs_f32());
-
-    // Ajustar cámara según la escena elegida
-    let mut camera = if scene_choice <= 3 {
-        // Escenas de isla flotante - vista más cercana y centrada
-        println!("📷 Posicionando cámara para vista de isla flotante...");
-        Camera::new(
-            Vector3::new(18.0, 0.0, 18.0),    // Más cerca, a nivel medio
-            Vector3::new(0.0, -3.0, 0.0),     // Mirar ligeramente abajo del centro
-            Vector3::new(0.0, 1.0, 0.0),
-        )
-    } else {
-        // Otras escenas - cámara normal
-        Camera::new(
-            Vector3::new(15.0, 8.0, 15.0),
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 1.0, 0.0),
-        )
-    };
+    let mut bvh = BVH::build(&objects);
+    println!("✅ BVH construido en {:.3}s\n", bvh_start.elapsed().as_secs_f32());
 
     let rotation_speed = PI / 60.0;
     let zoom_speed = 0.5;
 
-    println!("🎨 Renderizando escena inicial...");
+    println!("🎨 Renderizando primera imagen...");
     let render_start = std::time::Instant::now();
     render(&mut framebuffer, &bvh, &objects, &camera, &lights);
-    println!("✨ Primera imagen renderizada en {:.3}s", render_start.elapsed().as_secs_f32());
+    println!("✨ Renderizado inicial: {:.3}s\n", render_start.elapsed().as_secs_f32());
 
     window.set_target_fps(30);
 
-    println!("\n╔════════════════════════════════════════╗");
+    println!("╔════════════════════════════════════════╗");
     println!("║            🎮 CONTROLES 🎮             ║");
     println!("╠════════════════════════════════════════╣");
+    println!("║  1-6  : Cambiar escena (tiempo real)  ║");
     println!("║  ← →  : Rotar horizontalmente          ║");
     println!("║  ↑ ↓  : Rotar verticalmente            ║");
     println!("║  W S  : Zoom in/out                    ║");
-    println!("║  I    : Info de cámara                 ║");
     println!("║  R    : Reset cámara                   ║");
     println!("║  ESC  : Salir                          ║");
     println!("╚════════════════════════════════════════╝\n");
 
     if scene_choice <= 3 {
-        println!("✨ Observa la isla flotante en el Overworld arriba");
-        println!("🔥 y su reflejo oscuro en el Nether abajo!\n");
+        println!("✨ TIP: Observa la isla flotante arriba");
+        println!("🔥      y su reflejo del Nether abajo!\n");
     }
+
+    println!("▶️  Programa iniciado. Presiona 1-6 para cambiar de escena.\n");
 
     let mut frame_count = 0;
     let mut total_render_time = 0.0;
 
     while !window.window_should_close() {
         let mut needs_render = false;
+        let mut scene_changed = false;
 
+        // Detectar cambio de escena
+        let new_scene = if window.is_key_pressed(KeyboardKey::KEY_ONE) {
+            Some(1)
+        } else if window.is_key_pressed(KeyboardKey::KEY_TWO) {
+            Some(2)
+        } else if window.is_key_pressed(KeyboardKey::KEY_THREE) {
+            Some(3)
+        } else if window.is_key_pressed(KeyboardKey::KEY_FOUR) {
+            Some(4)
+        } else if window.is_key_pressed(KeyboardKey::KEY_FIVE) {
+            Some(5)
+        } else if window.is_key_pressed(KeyboardKey::KEY_SIX) {
+            Some(6)
+        } else if window.is_key_pressed(KeyboardKey::KEY_T) {
+            Some(6)
+        } else {
+            None
+        };
+
+        if let Some(new_scene_num) = new_scene {
+            if new_scene_num != scene_choice {
+                scene_choice = new_scene_num;
+                scene_changed = true;
+                
+                println!("\n╔════════════════════════════════════════╗");
+                println!("║     🔄 CAMBIANDO DE ESCENA...          ║");
+                println!("╚════════════════════════════════════════╝\n");
+                
+                // Cargar nueva escena
+                let start = std::time::Instant::now();
+                (objects, lights) = load_scene(scene_choice);
+                print_scene_info(scene_choice, objects.len(), lights.len());
+                
+                // Reconstruir BVH
+                println!("⚡ Reconstruyendo BVH...");
+                let bvh_start = std::time::Instant::now();
+                bvh = BVH::build(&objects);
+                println!("✅ BVH reconstruido en {:.3}s", bvh_start.elapsed().as_secs_f32());
+                
+                // Resetear cámara para la nueva escena
+                camera = get_camera_for_scene(scene_choice);
+                
+                println!("⏱️  Tiempo total de cambio: {:.3}s\n", start.elapsed().as_secs_f32());
+                
+                needs_render = true;
+                frame_count = 0;
+                total_render_time = 0.0;
+            }
+        }
+
+        // Controles de cámara
         if window.is_key_down(KeyboardKey::KEY_LEFT) {
             camera.orbit(rotation_speed, 0.0);
             needs_render = true;
@@ -488,29 +638,8 @@ fn main() {
             needs_render = true;
         }
         
-        // Info de cámara (tecla I)
-        if window.is_key_pressed(KeyboardKey::KEY_I) {
-            println!("\n📷 INFO DE CÁMARA:");
-            println!("   Posición: ({:.1}, {:.1}, {:.1})", camera.eye.x, camera.eye.y, camera.eye.z);
-            println!("   Mirando a: ({:.1}, {:.1}, {:.1})", camera.center.x, camera.center.y, camera.center.z);
-            println!("   Distancia al centro: {:.1}", (camera.eye - camera.center).length());
-        }
-        
-        // Reset cámara (tecla R)
         if window.is_key_pressed(KeyboardKey::KEY_R) {
-            if scene_choice <= 3 {
-                camera = Camera::new(
-                    Vector3::new(18.0, 0.0, 18.0),
-                    Vector3::new(0.0, -3.0, 0.0),
-                    Vector3::new(0.0, 1.0, 0.0),
-                );
-            } else {
-                camera = Camera::new(
-                    Vector3::new(15.0, 8.0, 15.0),
-                    Vector3::new(0.0, 0.0, 0.0),
-                    Vector3::new(0.0, 1.0, 0.0),
-                );
-            }
+            camera = get_camera_for_scene(scene_choice);
             println!("📷 Cámara reseteada");
             needs_render = true;
         }
@@ -522,19 +651,82 @@ fn main() {
             
             frame_count += 1;
             total_render_time += elapsed;
-            let avg_time = total_render_time / frame_count as f32;
             
-            println!("⚡ Frame {}: {:.3}s ({:.1} FPS) | Promedio: {:.3}s", 
-                     frame_count, elapsed, 1.0 / elapsed, avg_time);
+            if frame_count % 30 == 0 && !scene_changed {
+                let avg_time = total_render_time / frame_count as f32;
+                println!("⚡ Frame {}: {:.3}s ({:.1} FPS avg)", 
+                         frame_count, elapsed, 1.0 / avg_time);
+            }
         }
 
         framebuffer.swap_buffers(&mut window, &thread);
     }
 
-    println!("\n👋 ¡Gracias por usar el Ray Tracer!");
-    println!("📊 Estadísticas finales:");
-    println!("   Frames renderizados: {}", frame_count);
+    println!("\n╔════════════════════════════════════════╗");
+    println!("║         👋 PROGRAMA FINALIZADO         ║");
+    println!("╠════════════════════════════════════════╣");
+    println!("║  📊 Estadísticas finales:              ║");
+    println!("║     Frames renderizados: {}            ", frame_count);
     if frame_count > 0 {
-        println!("   Tiempo promedio: {:.3}s/frame", total_render_time / frame_count as f32);
+        let avg = total_render_time / frame_count as f32;
+        println!("║     Tiempo promedio: {:.3}s/frame      ", avg);
+        println!("║     FPS promedio: {:.1}                ", 1.0 / avg);
     }
+    println!("╚════════════════════════════════════════╝\n");
+}
+
+// Función auxiliar para cargar escenas
+fn load_scene(scene_num: i32) -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    match scene_num {
+        1 => create_floating_island_scene(),
+        2 => create_floating_island_with_waterfalls(),
+        3 => create_floating_island_with_bridge(),
+        4 => create_castle_scene(),
+        5 => create_house_scene(),
+        6 => create_simple_scene(),
+        _ => create_simple_scene(),
+    }
+}
+
+// Función auxiliar para obtener cámara según escena
+fn get_camera_for_scene(scene_num: i32) -> Camera {
+    if scene_num <= 3 {
+        Camera::new(
+            Vector3::new(25.0, 0.0, 25.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        )
+    } else if scene_num == 4 {
+        Camera::new(
+            Vector3::new(25.0, 15.0, 25.0),
+            Vector3::new(0.0, 5.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        )
+    } else {
+        Camera::new(
+            Vector3::new(15.0, 8.0, 15.0),
+            Vector3::new(0.0, 2.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        )
+    }
+}
+
+// Función auxiliar para imprimir info de escena
+fn print_scene_info(scene_num: i32, obj_count: usize, light_count: usize) {
+    println!("╔════════════════════════════════════════╗");
+    println!("║  🎬 ESCENA CARGADA: {}                  ║", scene_num);
+    println!("╠════════════════════════════════════════╣");
+    match scene_num {
+        1 => println!("║  🏝️  Isla Flotante Básica             ║"),
+        2 => println!("║  💧 Isla con Cascadas                  ║"),
+        3 => println!("║  🌉 Isla con Puente Portal             ║"),
+        4 => println!("║  🏰 Castillo Medieval                  ║"),
+        5 => println!("║  🏠 Casa con Jardín                    ║"),
+        6 => println!("║  📦 Escena Simple                      ║"),
+        _ => println!("║  ❓ Escena Desconocida                 ║"),
+    }
+    println!("╠════════════════════════════════════════╣");
+    println!("║  📊 Objetos: {:5}                      ║", obj_count);
+    println!("║  💡 Luces: {:2}                          ║", light_count);
+    println!("╚════════════════════════════════════════╝");
 }
