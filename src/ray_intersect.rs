@@ -1,7 +1,6 @@
 use raylib::prelude::Vector3;
 use crate::material::Material;
 
-/// Resultado de una intersección rayo-objeto
 #[derive(Clone)]
 pub struct Intersect {
     pub point: Vector3,
@@ -51,7 +50,6 @@ pub trait RayIntersect {
     fn get_bounds(&self) -> AABB;
 }
 
-/// Axis-Aligned Bounding Box para aceleración espacial
 #[derive(Clone, Copy, Debug)]
 pub struct AABB {
     pub min: Vector3,
@@ -98,7 +96,6 @@ impl AABB {
         (self.min + self.max) * 0.5
     }
 
-    /// Intersección rápida rayo-AABB usando el algoritmo slab method
     pub fn intersect(&self, ray_origin: &Vector3, ray_direction: &Vector3) -> bool {
         let inv_dir = Vector3::new(
             1.0 / ray_direction.x,
@@ -120,59 +117,58 @@ impl AABB {
     }
 }
 
-/// Bounding Volume Hierarchy para aceleración de ray tracing
 pub struct BVH {
-    nodes: Vec<BVHNode>,
+    root: Option<Box<BVHNode>>,
 }
 
-struct BVHNode {
-    bounds: AABB,
-    left: Option<usize>,
-    right: Option<usize>,
-    object_index: Option<usize>,
+enum BVHNode {
+    Leaf {
+        bounds: AABB,
+        object_index: usize,
+    },
+    Internal {
+        bounds: AABB,
+        left: Box<BVHNode>,
+        right: Box<BVHNode>,
+    },
 }
 
 impl BVH {
     pub fn build(objects: &[std::sync::Arc<dyn RayIntersect + Send + Sync>]) -> Self {
         if objects.is_empty() {
-            return BVH { nodes: Vec::new() };
+            return BVH { root: None };
         }
 
-        let mut nodes = Vec::new();
         let mut primitives: Vec<(AABB, usize)> = objects
             .iter()
             .enumerate()
             .map(|(i, obj)| (obj.get_bounds(), i))
             .collect();
 
-        Self::build_recursive(&mut primitives, &mut nodes, 0);
-
-        BVH { nodes }
+        let root = Self::build_recursive(&mut primitives, 0);
+        
+        BVH { root: Some(Box::new(root)) }
     }
 
-    fn build_recursive(
-        primitives: &mut [(AABB, usize)],
-        nodes: &mut Vec<BVHNode>,
-        depth: u32,
-    ) -> usize {
-        // Calcular bounds de todos los primitivos
+    fn build_recursive(primitives: &mut [(AABB, usize)], depth: u32) -> BVHNode {
         let bounds = primitives
             .iter()
             .fold(primitives[0].0, |acc, (aabb, _)| acc.union(aabb));
 
-        // Caso base: crear hoja
-        if primitives.len() == 1 || depth > 32 {
-            let node_index = nodes.len();
-            nodes.push(BVHNode {
+        if primitives.len() == 1 {
+            return BVHNode::Leaf {
                 bounds,
-                left: None,
-                right: None,
-                object_index: Some(primitives[0].1),
-            });
-            return node_index;
+                object_index: primitives[0].1,
+            };
         }
 
-        // Elegir eje de división (el más largo)
+        if depth > 50 {
+            return BVHNode::Leaf {
+                bounds,
+                object_index: primitives[0].1,
+            };
+        }
+
         let extent = bounds.max - bounds.min;
         let axis = if extent.x > extent.y && extent.x > extent.z {
             0
@@ -182,7 +178,6 @@ impl BVH {
             2
         };
 
-        // Ordenar primitivos por el centro en el eje elegido
         primitives.sort_by(|a, b| {
             let center_a = a.0.center();
             let center_b = b.0.center();
@@ -196,27 +191,22 @@ impl BVH {
                 1 => center_b.y,
                 _ => center_b.z,
             };
-            val_a.partial_cmp(&val_b).unwrap()
+            val_a.partial_cmp(&val_b).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // Dividir en mitades
         let mid = primitives.len() / 2;
-        let (left_prims, right_prims) = primitives.split_at_mut(mid);
+        let mid = mid.max(1).min(primitives.len() - 1);
+        
+        let (left_slice, right_slice) = primitives.split_at_mut(mid);
+        
+        let left = Self::build_recursive(left_slice, depth + 1);
+        let right = Self::build_recursive(right_slice, depth + 1);
 
-        // Construir subárboles
-        let left = Self::build_recursive(left_prims, nodes, depth + 1);
-        let right = Self::build_recursive(right_prims, nodes, depth + 1);
-
-        // Crear nodo interno
-        let node_index = nodes.len();
-        nodes.push(BVHNode {
+        BVHNode::Internal {
             bounds,
-            left: Some(left),
-            right: Some(right),
-            object_index: None,
-        });
-
-        node_index
+            left: Box::new(left),
+            right: Box::new(right),
+        }
     }
 
     pub fn intersect(
@@ -225,78 +215,55 @@ impl BVH {
         ray_direction: &Vector3,
         objects: &[std::sync::Arc<dyn RayIntersect + Send + Sync>],
     ) -> Intersect {
-        if self.nodes.is_empty() {
-            return Intersect::empty();
+        if let Some(root) = &self.root {
+            let mut best_intersect = Intersect::empty();
+            let mut best_distance = f32::INFINITY;
+            
+            Self::intersect_node(
+                root,
+                ray_origin,
+                ray_direction,
+                objects,
+                &mut best_intersect,
+                &mut best_distance,
+            );
+            
+            best_intersect
+        } else {
+            Intersect::empty()
         }
-
-        let mut best_intersect = Intersect::empty();
-        let mut best_distance = f32::INFINITY;
-
-        self.intersect_recursive(
-            0,
-            ray_origin,
-            ray_direction,
-            objects,
-            &mut best_intersect,
-            &mut best_distance,
-        );
-
-        best_intersect
     }
 
-    fn intersect_recursive(
-        &self,
-        node_index: usize,
+    fn intersect_node(
+        node: &BVHNode,
         ray_origin: &Vector3,
         ray_direction: &Vector3,
         objects: &[std::sync::Arc<dyn RayIntersect + Send + Sync>],
         best_intersect: &mut Intersect,
         best_distance: &mut f32,
     ) {
-        if node_index >= self.nodes.len() {
-            return;
-        }
-
-        let node = &self.nodes[node_index];
-
-        // Prueba contra el AABB del nodo
-        if !node.bounds.intersect(ray_origin, ray_direction) {
-            return;
-        }
-
-        // Si es hoja, intersectar con el objeto
-        if let Some(obj_idx) = node.object_index {
-            if obj_idx < objects.len() {
-                let intersect = objects[obj_idx].ray_intersect(ray_origin, ray_direction);
-                if intersect.is_intersecting && intersect.distance < *best_distance {
-                    *best_distance = intersect.distance;
-                    *best_intersect = intersect;
+        match node {
+            BVHNode::Leaf { bounds, object_index } => {
+                if !bounds.intersect(ray_origin, ray_direction) {
+                    return;
+                }
+                
+                if *object_index < objects.len() {
+                    let intersect = objects[*object_index].ray_intersect(ray_origin, ray_direction);
+                    if intersect.is_intersecting && intersect.distance < *best_distance {
+                        *best_distance = intersect.distance;
+                        *best_intersect = intersect;
+                    }
                 }
             }
-            return;
-        }
-
-        // Recursión en hijos
-        if let Some(left) = node.left {
-            self.intersect_recursive(
-                left,
-                ray_origin,
-                ray_direction,
-                objects,
-                best_intersect,
-                best_distance,
-            );
-        }
-
-        if let Some(right) = node.right {
-            self.intersect_recursive(
-                right,
-                ray_origin,
-                ray_direction,
-                objects,
-                best_intersect,
-                best_distance,
-            );
+            BVHNode::Internal { bounds, left, right } => {
+                if !bounds.intersect(ray_origin, ray_direction) {
+                    return;
+                }
+                
+                Self::intersect_node(left, ray_origin, ray_direction, objects, best_intersect, best_distance);
+                Self::intersect_node(right, ray_origin, ray_direction, objects, best_intersect, best_distance);
+            }
         }
     }
 }
