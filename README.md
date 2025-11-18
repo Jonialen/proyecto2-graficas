@@ -96,3 +96,7 @@ Puedes cambiar entre las siguientes escenas usando las teclas numéricas:
 -   [image-rs](https://github.com/image-rs/image) - Para la carga y guardado de imágenes.
 -   [tobj](https://github.com/Twinklebear/tobj) - Para la carga de modelos 3D en formato `.obj`.
 -   [Pillow](https://python-pillow.org/) - Para la generación de texturas en el script de Python.
+
+## Video
+
+-   [VIDEO](https://youtu.be/T_MPbYSoxVM) - Muestra del video
