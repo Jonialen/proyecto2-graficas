@@ -15,6 +15,7 @@ pub struct SceneBuilder {
     grass_positions: Vec<(i32, i32, i32)>,
     occupied_positions: HashSet<(i32, i32, i32)>,
 }
+
 struct MaterialLibrary {
     materials: std::collections::HashMap<String, Material>,
 }
@@ -39,6 +40,11 @@ impl MaterialLibrary {
         materials.insert("netherrack".to_string(), Self::netherrack());
         materials.insert("nether_brick".to_string(), Self::nether_brick());
         materials.insert("soul_sand".to_string(), Self::soul_sand());
+        materials.insert("diamond".to_string(), Self::diamond());
+        materials.insert("emerald".to_string(), Self::emerald());
+        materials.insert("obsidian".to_string(), Self::obsidian());
+        materials.insert("ice".to_string(), Self::ice());
+        materials.insert("portal".to_string(), Self::portal());
         
         MaterialLibrary { materials }
     }
@@ -48,52 +54,276 @@ impl MaterialLibrary {
     }
     
     fn grass_top() -> Material {
-        Material::new(Vector3::new(0.2, 0.8, 0.2), 10.0, [0.9, 0.1], 0.0, 0.0, Vector3::zero(), Some("grass_top".to_string()))
+        Material::new(
+            Vector3::new(0.2, 0.8, 0.2),
+            10.0,
+            [0.9, 0.1],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("grass_top".to_string())
+        )
     }
+    
     fn grass_side() -> Material {
-        Material::new(Vector3::new(0.2, 0.8, 0.2), 10.0, [0.9, 0.1], 0.0, 0.0, Vector3::zero(), Some("grass_side".to_string()))
+        Material::new(
+            Vector3::new(0.2, 0.8, 0.2),
+            10.0,
+            [0.9, 0.1],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("grass_side".to_string())
+        )
     }
+    
     fn dirt() -> Material {
-        Material::new(Vector3::new(0.6, 0.4, 0.2), 5.0, [0.85, 0.05], 0.0, 0.0, Vector3::zero(), Some("dirt".to_string()))
+        Material::new(
+            Vector3::new(0.6, 0.4, 0.2),
+            5.0,
+            [0.85, 0.05],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("dirt".to_string())
+        )
     }
+    
     fn stone() -> Material {
-        Material::new(Vector3::new(0.5, 0.5, 0.5), 15.0, [0.8, 0.15], 0.0, 0.0, Vector3::zero(), Some("stone".to_string()))
+        Material::new(
+            Vector3::new(0.5, 0.5, 0.5),
+            15.0,
+            [0.8, 0.15],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("stone".to_string())
+        )
     }
+    
     fn wood() -> Material {
-        Material::new(Vector3::new(0.4, 0.25, 0.1), 8.0, [0.75, 0.08], 0.0, 0.0, Vector3::zero(), Some("wood".to_string()))
+        Material::new(
+            Vector3::new(0.4, 0.25, 0.1),
+            8.0,
+            [0.75, 0.08],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("wood".to_string())
+        )
     }
+    
     fn leaves() -> Material {
-        Material::new(Vector3::new(0.1, 0.5, 0.1), 5.0, [0.85, 0.05], 0.0, 0.0, Vector3::zero(), Some("leaves".to_string()))
+        Material::new(
+            Vector3::new(0.1, 0.5, 0.1),
+            5.0,
+            [0.85, 0.05],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("leaves".to_string())
+        )
     }
+    
     fn water() -> Material {
-        Material::new(Vector3::new(0.1, 0.3, 0.7), 100.0, [0.2, 0.6], 0.0, 0.5, Vector3::zero(), Some("water".to_string()))
+        Material::new(
+            Vector3::new(0.1, 0.3, 0.7),
+            100.0,
+            [0.2, 0.6],
+            0.7,
+            0.3,
+            1.33,
+            Vector3::zero(),
+            Some("water".to_string())
+        )
     }
+    
     fn lava() -> Material {
-        Material::new(Vector3::new(1.0, 0.3, 0.0), 20.0, [0.6, 0.3], 0.0, 0.0, Vector3::new(1.0, 0.4, 0.05), Some("lava".to_string()))
+        Material::new(
+            Vector3::new(1.0, 0.3, 0.0),
+            20.0,
+            [0.6, 0.3],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::new(1.0, 0.4, 0.05),
+            Some("lava".to_string())
+        )
     }
+    
     fn glowstone() -> Material {
-        Material::new(Vector3::new(1.0, 0.9, 0.6), 30.0, [0.5, 0.3], 0.0, 0.0, Vector3::new(1.5, 1.2, 0.6), Some("glowstone".to_string()))
+        Material::new(
+            Vector3::new(1.0, 0.9, 0.6),
+            30.0,
+            [0.5, 0.3],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::new(1.5, 1.2, 0.6),
+            Some("glowstone".to_string())
+        )
     }
+    
     fn glass() -> Material {
-        Material::new(Vector3::new(0.9, 0.9, 1.0), 150.0, [0.1, 0.8], 0.7, 0.4, Vector3::zero(), None)
+        Material::new(
+            Vector3::new(0.9, 0.9, 1.0),
+            150.0,
+            [0.1, 0.8],
+            0.8,
+            0.2,
+            1.52,
+            Vector3::zero(),
+            None
+        )
     }
+    
     fn mirror() -> Material {
-        Material::new(Vector3::new(0.9, 0.9, 1.0), 120.0, [0.05, 0.6], 0.0, 0.85, Vector3::zero(), None)
+        Material::new(
+            Vector3::new(0.9, 0.9, 1.0),
+            120.0,
+            [0.05, 0.6],
+            0.0,
+            0.95,
+            1.0,
+            Vector3::zero(),
+            None
+        )
     }
+    
     fn gold() -> Material {
-        Material::new(Vector3::new(1.0, 0.85, 0.0), 200.0, [0.2, 0.7], 0.0, 0.9, Vector3::zero(), None)
+        Material::new(
+            Vector3::new(1.0, 0.85, 0.0),
+            200.0,
+            [0.2, 0.7],
+            0.0,
+            0.6,
+            1.0,
+            Vector3::zero(),
+            None
+        )
     }
+    
     fn silver() -> Material {
-        Material::new(Vector3::new(0.95, 0.95, 0.95), 180.0, [0.15, 0.75], 0.0, 0.95, Vector3::zero(), None)
+        Material::new(
+            Vector3::new(0.95, 0.95, 0.95),
+            180.0,
+            [0.15, 0.75],
+            0.0,
+            0.85,
+            1.0,
+            Vector3::zero(),
+            None
+        )
     }
+    
     fn netherrack() -> Material {
-        Material::new(Vector3::new(0.6, 0.1, 0.1), 10.0, [0.8, 0.1], 0.0, 0.0, Vector3::zero(), Some("netherrack".to_string()))
+        Material::new(
+            Vector3::new(0.6, 0.1, 0.1),
+            10.0,
+            [0.8, 0.1],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("netherrack".to_string())
+        )
     }
+    
     fn nether_brick() -> Material {
-        Material::new(Vector3::new(0.2, 0.05, 0.05), 15.0, [0.7, 0.15], 0.0, 0.0, Vector3::zero(), Some("nether_brick".to_string()))
+        Material::new(
+            Vector3::new(0.2, 0.05, 0.05),
+            15.0,
+            [0.7, 0.15],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("nether_brick".to_string())
+        )
     }
+    
     fn soul_sand() -> Material {
-        Material::new(Vector3::new(0.3, 0.2, 0.15), 8.0, [0.75, 0.1], 0.0, 0.0, Vector3::zero(), Some("soul_sand".to_string()))
+        Material::new(
+            Vector3::new(0.3, 0.2, 0.15),
+            8.0,
+            [0.75, 0.1],
+            0.0,
+            0.0,
+            1.0,
+            Vector3::zero(),
+            Some("soul_sand".to_string())
+        )
+    }
+    
+    fn diamond() -> Material {
+        Material::new(
+            Vector3::new(0.7, 0.9, 1.0),
+            250.0,
+            [0.1, 0.9],
+            0.9,
+            0.4,
+            2.42,
+            Vector3::new(0.1, 0.2, 0.3),
+            Some("diamond".to_string())
+        )
+    }
+    
+    fn emerald() -> Material {
+        Material::new(
+            Vector3::new(0.2, 0.9, 0.3),
+            200.0,
+            [0.15, 0.85],
+            0.8,
+            0.3,
+            1.57,
+            Vector3::new(0.05, 0.15, 0.05),
+            Some("emerald".to_string())
+        )
+    }
+    
+    fn obsidian() -> Material {
+        Material::new(
+            Vector3::new(0.05, 0.0, 0.15),
+            100.0,
+            [0.6, 0.4],
+            0.0,
+            0.5,
+            1.0,
+            Vector3::zero(),
+            Some("obsidian".to_string())
+        )
+    }
+    
+    fn ice() -> Material {
+        Material::new(
+            Vector3::new(0.8, 0.9, 1.0),
+            180.0,
+            [0.1, 0.8],
+            0.85,
+            0.2,
+            1.31,
+            Vector3::zero(),
+            Some("ice".to_string())
+        )
+    }
+    
+    fn portal() -> Material {
+        Material::new(
+            Vector3::new(0.5, 0.0, 0.8),
+            100.0,
+            [0.3, 0.5],
+            0.6,
+            0.3,
+            1.2,
+            Vector3::new(0.8, 0.2, 1.5),
+            Some("portal".to_string())
+        )
     }
 }
 
@@ -259,7 +489,7 @@ impl SceneBuilder {
     }
     
     pub fn add_torch(mut self, x: f32, y: f32, z: f32) -> Self {
-        let torch_mat = Material::new(Vector3::new(1.0, 0.6, 0.0), 40.0, [0.3, 0.2], 0.0, 0.0, Vector3::new(1.2, 0.6, 0.1), Some("glowstone".to_string()));
+        let torch_mat = Material::new(Vector3::new(1.0, 0.6, 0.0), 40.0, [0.3, 0.2], 0.0, 0.0, 0.1, Vector3::new(1.2, 0.6, 0.1), Some("glowstone".to_string()));
         
         self.objects.push(Arc::new(Cube::new(Vector3::new(x, y, z), 0.3, torch_mat)));
         self.lights.push(Light::new(Vector3::new(x, y + 0.5, z), Color::new(255, 180, 80, 255), 2.5));
@@ -402,7 +632,7 @@ impl SceneBuilder {
         let lake_size = lake_positions.len(); // Guardar tamaño antes del loop
         
         // 3. Excavar el lago y llenar con agua
-        for &(x, surface_y, z) in &lake_positions {  // ✅ Usar referencia
+        for &(x, surface_y, z) in &lake_positions {
             // Remover bloques de tierra/grass
             for dy in 0..=depth {
                 let y = surface_y - dy;
@@ -417,8 +647,6 @@ impl SceneBuilder {
                 // Los otros bloques simplemente se remueven (quedan como aire)
             }
         }
-        
-        println!("💧 Lago generado con {} bloques de agua", lake_size);
         
         self
     }
@@ -530,8 +758,6 @@ impl SceneBuilder {
             }
         }
         
-        println!("🌳 Generados {} árboles", tree_count);
-        
         self
     }
     
@@ -543,7 +769,6 @@ impl SceneBuilder {
         self = self.add_lava_lake(center_x - 3, bottom_y - 1, center_z - 3, 2);
         self = self.add_lava_lake(center_x + 4, bottom_y - 1, center_z + 4, 3);
         
-        // ✅ Pilares de glowstone con tamaño 1.0
         let pillar_positions = [
             (center_x - 4, center_z - 4),
             (center_x + 5, center_z + 4),

@@ -672,6 +672,142 @@ pub fn canyon_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) 
         .build()
 }
 
+/// ESCENA 12: Portal Dimensional
+pub fn portal_scene() -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, Vec<Light>) {
+    let mut builder = SceneBuilder::new();
+    
+    // Plataforma base de obsidiana
+    for x in -15..=15 {
+        for z in -15..=15 {
+            builder = builder.add_cube(x as f32, 0.0, z as f32, 1.0, "obsidian");
+        }
+    }
+    
+    // Marco del portal (obsidiana)
+    let portal_height = 10;
+    
+    // Columnas laterales
+    for y in 1..=portal_height {
+        builder = builder
+            .add_cube(-3.0, y as f32, 0.0, 1.0, "obsidian")
+            .add_cube(3.0, y as f32, 0.0, 1.0, "obsidian");
+    }
+    
+    // Techo
+    for x in -2..=2 {
+        builder = builder.add_cube(x as f32, (portal_height + 1) as f32, 0.0, 1.0, "obsidian");
+    }
+    
+    // Interior del portal (material portal con efectos especiales)
+    for y in 2..=portal_height {
+        for x in -1..=1 {
+            builder = builder.add_cube(x as f32, y as f32, 0.0, 1.0, "portal");
+        }
+    }
+    
+    // Decoración: Bloques de glowstone alrededor
+    let glow_positions = [
+        (-5, 1, -3), (-5, 1, 3), (5, 1, -3), (5, 1, 3),
+        (-5, 5, -3), (-5, 5, 3), (5, 5, -3), (5, 5, 3),
+    ];
+    
+    for (x, y, z) in glow_positions {
+        builder = builder.add_cube(x as f32, y as f32, z as f32, 1.0, "glowstone");
+    }
+    
+    // Camino de obsidiana
+    for z in 5..15 {
+        for x in -1..=1 {
+            builder = builder.add_cube(x as f32, 1.0, z as f32, 1.0, "obsidian");
+        }
+    }
+    
+    // Pilares decorativos con materiales refractivos
+    let pillar_data = [
+        (-8, -8, "diamond"),
+        (-8, 8, "emerald"),
+        (8, -8, "emerald"),
+        (8, 8, "diamond"),
+    ];
+    
+    for (px, pz, mat) in pillar_data {
+        for y in 1..6 {
+            builder = builder.add_cube(px as f32, y as f32, pz as f32, 1.0, mat);
+        }
+        // Corona de hielo en la cima
+        for dx in -1_i32..=1 {
+            for dz in -1_i32..=1 {
+                if dx.abs() + dz.abs() == 1 {
+                    builder = builder.add_cube((px + dx) as f32, 6.0, (pz + dz) as f32, 1.0, "ice");
+                }
+            }
+        }
+    }
+    
+    // Árboles cristalizados
+    for (tx, tz) in [(-12, -10), (12, -10), (-10, 12), (10, 12)] {
+        // Tronco de hielo
+        for y in 1..5 {
+            builder = builder.add_cube(tx as f32, y as f32, tz as f32, 1.0, "ice");
+        }
+        // Copa de esmeralda
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                if dx != 0 || dz != 0 {
+                    builder = builder.add_cube(
+                        (tx + dx) as f32,
+                        5.0,
+                        (tz + dz) as f32,
+                        1.0,
+                        "emerald"
+                    );
+                }
+            }
+        }
+    }
+    
+    // Piscina de agua refractiva con bordes de diamante
+    for x in -3_i32..=3 {
+        for z in 8_i32..=12 {
+            if x.abs() == 3 || z == 8 || z == 12 {
+                builder = builder.add_cube(x as f32, 1.0, z as f32, 1.0, "diamond");
+            } else {
+                builder = builder.add_cube(x as f32, 1.0, z as f32, 1.0, "water");
+            }
+        }
+    }
+    
+    // Anillos de glowstone flotantes alrededor del portal
+    for i in 0..8 {
+        let angle = (i as f32 / 8.0) * std::f32::consts::PI * 2.0;
+        let radius = 7.0;
+        let x = angle.cos() * radius;
+        let z = angle.sin() * radius;
+        
+        builder = builder.add_cube(x, 6.0, z, 0.5, "glowstone");
+    }
+    
+    // Círculo de portales pequeños decorativos
+    for i in 0..12 {
+        let angle = (i as f32 / 12.0) * std::f32::consts::PI * 2.0;
+        let radius = 13.0;
+        let x = (angle.cos() * radius) as i32;
+        let z = (angle.sin() * radius) as i32;
+        
+        for y in 1..3 {
+            builder = builder.add_cube(x as f32, y as f32, z as f32, 0.6, "portal");
+        }
+    }
+    
+    builder
+        .add_sun(0.0, 30.0, 20.0, 5.0)
+        .add_light(0.0, 6.0, 0.0, Color::new(200, 100, 255, 255), 8.0) // Luz del portal
+        .add_light(-8.0, 4.0, -8.0, Color::new(100, 200, 255, 255), 3.0)
+        .add_light(8.0, 4.0, 8.0, Color::new(100, 255, 200, 255), 3.0)
+        .add_light(0.0, 10.0, 10.0, Color::new(150, 200, 255, 255), 2.5)
+        .build()
+}
+
 /// Configuración de escenas
 pub struct SceneInfo {
     pub name: &'static str,
@@ -737,6 +873,11 @@ impl SceneInfo {
                 camera_pos: Vector3::new(0.0, 25.0, 40.0),
                 camera_target: Vector3::new(0.0, 5.0, 0.0),
             },
+            12 => SceneInfo {
+                name: "🌀 Portal Dimensional",
+                camera_pos: Vector3::new(0.0, 8.0, 25.0),
+                camera_target: Vector3::new(0.0, 5.0, 0.0),
+            },            
             _ => SceneInfo {
                 name: "❓ Escena Desconocida",
                 camera_pos: Vector3::new(15.0, 8.0, 15.0),
@@ -760,6 +901,7 @@ pub fn load_scene(scene_num: i32) -> (Vec<Arc<dyn RayIntersect + Send + Sync>>, 
         9 => massive_archipelago_scene(),
         10 => temple_scene(),
         11 => canyon_scene(),
+        12 => portal_scene(),
         _ => simple_scene(),
     }
 }

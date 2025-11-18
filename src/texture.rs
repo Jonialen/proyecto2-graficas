@@ -2,41 +2,45 @@ use raylib::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Sistema de gestión de texturas con placeholders y carga desde archivos
-pub struct TextureManager {
-    /// Cache de texturas cargadas (nombre -> datos RGBA)
-    textures: HashMap<String, TextureData>,
-    
-    /// Dimensiones por defecto para texturas procedurales
-    default_size: u32,
-}
-
-/// Datos de una textura cargada
 #[derive(Clone)]
 pub struct TextureData {
     pub width: u32,
     pub height: u32,
-    pub data: Vec<u8>, // RGBA format
+    pub data: Vec<u8>,
+}
+
+pub struct AnimatedTexture {
+    frames: Vec<TextureData>,
+    frame_duration: f32,
+}
+
+pub struct TextureManager {
+    textures: HashMap<String, TextureData>,
+    animated_textures: HashMap<String, AnimatedTexture>,
+    default_size: u32,
+    time: f32,
 }
 
 impl TextureManager {
-    /// Crea un nuevo gestor de texturas
     pub fn new() -> Self {
         let mut manager = TextureManager {
             textures: HashMap::new(),
-            default_size: 16, // Texturas 16x16 como en Minecraft clásico
+            animated_textures: HashMap::new(),
+            default_size: 16,
+            time: 0.0,
         };
         
-        // Cargar texturas placeholder por defecto
         manager.load_placeholder_textures();
-        
-        // Intentar cargar texturas desde assets/textures/
+        manager.load_animated_textures();
         manager.load_textures_from_directory("assets/textures");
         
         manager
     }
 
-    /// Carga texturas desde un directorio
+    pub fn update(&mut self, delta_time: f32) {
+        self.time += delta_time;
+    }
+
     pub fn load_textures_from_directory(&mut self, dir_path: &str) {
         let path = Path::new(dir_path);
         
@@ -53,7 +57,6 @@ impl TextureManager {
                 if let Some(extension) = file_path.extension() {
                     let ext = extension.to_string_lossy().to_lowercase();
                     
-                    // Soportar PNG, JPG, BMP, TGA
                     if ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "bmp" || ext == "tga" {
                         if let Some(file_name) = file_path.file_stem() {
                             let texture_name = file_name.to_string_lossy().to_string();
@@ -68,11 +71,7 @@ impl TextureManager {
         }
     }
 
-    /// Carga una textura específica desde un archivo
     pub fn load_texture_from_file(&mut self, name: &str, file_path: &str) -> bool {
-        // Intentar cargar la imagen usando image crate o manualmente con raylib
-        // Por ahora usamos un método simple con lectura de archivos
-        
         match self.load_image_data(file_path) {
             Ok(texture_data) => {
                 self.textures.insert(name.to_string(), texture_data);
@@ -85,9 +84,7 @@ impl TextureManager {
         }
     }
 
-    /// Carga datos de imagen desde un archivo (wrapper simple)
     fn load_image_data(&self, file_path: &str) -> Result<TextureData, String> {
-        // Usar image crate para cargar la imagen
         use image::GenericImageView;
         
         let img = image::open(file_path)
@@ -103,34 +100,115 @@ impl TextureManager {
         })
     }
 
-    /// Genera texturas placeholder con patrones únicos
+    fn load_animated_textures(&mut self) {
+        let water_frames = vec![
+            self.generate_water_frame(0),
+            self.generate_water_frame(1),
+            self.generate_water_frame(2),
+            self.generate_water_frame(3),
+        ];
+        
+        self.animated_textures.insert(
+            "water".to_string(),
+            AnimatedTexture {
+                frames: water_frames.into_iter().map(|data| TextureData {
+                    width: self.default_size,
+                    height: self.default_size,
+                    data,
+                }).collect(),
+                frame_duration: 0.3,
+            },
+        );
+
+        let lava_frames = vec![
+            self.generate_lava_frame(0),
+            self.generate_lava_frame(1),
+            self.generate_lava_frame(2),
+            self.generate_lava_frame(3),
+        ];
+        
+        self.animated_textures.insert(
+            "lava".to_string(),
+            AnimatedTexture {
+                frames: lava_frames.into_iter().map(|data| TextureData {
+                    width: self.default_size,
+                    height: self.default_size,
+                    data,
+                }).collect(),
+                frame_duration: 0.2,
+            },
+        );
+
+        let portal_frames = vec![
+            self.generate_portal_frame(0),
+            self.generate_portal_frame(1),
+            self.generate_portal_frame(2),
+            self.generate_portal_frame(3),
+            self.generate_portal_frame(4),
+            self.generate_portal_frame(5),
+        ];
+        
+        self.animated_textures.insert(
+            "portal".to_string(),
+            AnimatedTexture {
+                frames: portal_frames.into_iter().map(|data| TextureData {
+                    width: self.default_size,
+                    height: self.default_size,
+                    data,
+                }).collect(),
+                frame_duration: 0.15,
+            },
+        );
+    }
+
     fn load_placeholder_textures(&mut self) {
         let size = self.default_size;
         
-        // Placeholder para materiales comunes de Minecraft
         self.register_procedural("grass_top", size, size, self.generate_grass_top());
         self.register_procedural("grass_side", size, size, self.generate_grass_side());
         self.register_procedural("dirt", size, size, self.generate_dirt());
         self.register_procedural("stone", size, size, self.generate_stone());
         self.register_procedural("wood", size, size, self.generate_wood());
         self.register_procedural("leaves", size, size, self.generate_leaves());
-        self.register_procedural("water", size, size, self.generate_water());
-        self.register_procedural("lava", size, size, self.generate_lava());
         self.register_procedural("netherrack", size, size, self.generate_netherrack());
         self.register_procedural("nether_brick", size, size, self.generate_nether_brick());
         self.register_procedural("soul_sand", size, size, self.generate_soul_sand());
         self.register_procedural("glowstone", size, size, self.generate_glowstone());
+        self.register_procedural("diamond", size, size, self.generate_diamond());
+        self.register_procedural("emerald", size, size, self.generate_emerald());
+        self.register_procedural("obsidian", size, size, self.generate_obsidian());
+        self.register_procedural("ice", size, size, self.generate_ice());
         
         println!("✨ {} texturas procedurales cargadas", self.textures.len());
     }
 
-    /// Obtiene el color de una textura en coordenadas UV
     pub fn sample(&self, texture_name: &str, u: f32, v: f32) -> Vector3 {
+        if let Some(animated) = self.animated_textures.get(texture_name) {
+            let total_frames = animated.frames.len() as f32;
+            let frame_index = ((self.time / animated.frame_duration) % total_frames) as usize;
+            let texture_data = &animated.frames[frame_index];
+            
+            let width = texture_data.width as f32;
+            let height = texture_data.height as f32;
+            
+            let x = ((u * width) as u32 % texture_data.width) as usize;
+            let y = ((v * height) as u32 % texture_data.height) as usize;
+            
+            let idx = (y * texture_data.width as usize + x) * 4;
+            
+            if idx + 2 < texture_data.data.len() {
+                return Vector3::new(
+                    texture_data.data[idx] as f32 / 255.0,
+                    texture_data.data[idx + 1] as f32 / 255.0,
+                    texture_data.data[idx + 2] as f32 / 255.0,
+                );
+            }
+        }
+
         if let Some(texture_data) = self.textures.get(texture_name) {
             let width = texture_data.width as f32;
             let height = texture_data.height as f32;
             
-            // Convertir UV (0-1) a coordenadas de texel con wrapping
             let x = ((u * width) as u32 % texture_data.width) as usize;
             let y = ((v * height) as u32 % texture_data.height) as usize;
             
@@ -145,16 +223,14 @@ impl TextureManager {
             }
         }
         
-        // Fallback: patrón de tablero de ajedrez rosa/negro (indica textura faltante)
         let checker = ((u * 8.0) as i32 + (v * 8.0) as i32) % 2;
         if checker == 0 {
-            Vector3::new(1.0, 0.0, 1.0) // Magenta
+            Vector3::new(1.0, 0.0, 1.0)
         } else {
-            Vector3::new(0.0, 0.0, 0.0) // Negro
+            Vector3::new(0.0, 0.0, 0.0)
         }
     }
 
-    /// Registra una textura procedural manualmente
     pub fn register_procedural(&mut self, name: &str, width: u32, height: u32, data: Vec<u8>) {
         self.textures.insert(
             name.to_string(),
@@ -166,18 +242,15 @@ impl TextureManager {
         );
     }
 
-    // ===== GENERADORES DE TEXTURAS PLACEHOLDER =====
-
     fn generate_grass_top(&self) -> Vec<u8> {
         let mut data = Vec::new();
         for y in 0..self.default_size {
             for x in 0..self.default_size {
-                // Verde con variación aleatoria
                 let noise = ((x * 7 + y * 13) % 5) as u8;
-                data.push(50 + noise);   // R
-                data.push(180 + noise);  // G
-                data.push(50 + noise);   // B
-                data.push(255);          // A
+                data.push(50 + noise);
+                data.push(180 + noise);
+                data.push(50 + noise);
+                data.push(255);
             }
         }
         data
@@ -188,14 +261,12 @@ impl TextureManager {
         for y in 0..self.default_size {
             for x in 0..self.default_size {
                 if y < self.default_size / 4 {
-                    // Parte superior verde
                     let noise = ((x * 7 + y * 13) % 5) as u8;
                     data.push(50 + noise);
                     data.push(180 + noise);
                     data.push(50 + noise);
                     data.push(255);
                 } else {
-                    // Parte inferior café (tierra)
                     let noise = ((x * 11 + y * 17) % 8) as u8;
                     data.push(130 + noise);
                     data.push(80 + noise);
@@ -239,7 +310,6 @@ impl TextureManager {
         let mut data = Vec::new();
         for y in 0..self.default_size {
             for x in 0..self.default_size {
-                // Patrón de anillos
                 let ring = (x as i32 - 8).abs() + (y as i32 - 8).abs();
                 let noise = (ring % 4) as u8 * 10;
                 data.push(80 + noise);
@@ -265,29 +335,55 @@ impl TextureManager {
         data
     }
 
-    fn generate_water(&self) -> Vec<u8> {
+    fn generate_water_frame(&self, frame: i32) -> Vec<u8> {
         let mut data = Vec::new();
+        let offset = frame as u32 * 2;
+        
         for y in 0..self.default_size {
             for x in 0..self.default_size {
-                let wave = ((x + y) % 4) as u8 * 5;
+                let wave = (((x + offset) + y) % 4) as u8 * 8;
                 data.push(20 + wave);
                 data.push(60 + wave);
                 data.push(180 + wave);
-                data.push(200); // Semi-transparente
+                data.push(200);
             }
         }
         data
     }
 
-    fn generate_lava(&self) -> Vec<u8> {
+    fn generate_lava_frame(&self, frame: i32) -> Vec<u8> {
         let mut data = Vec::new();
+        let offset = (frame * 17) as u32;
+        
         for y in 0..self.default_size {
             for x in 0..self.default_size {
-                let flow = ((x * 3 + y * 7) % 10) as u8 * 8;
+                let flow = ((x * 3 + y * 7 + offset) % 12) as u8 * 10;
+                let bubble = if (x + y + offset / 2) % 7 == 0 { 40 } else { 0 };
                 data.push(255);
-                data.push(100 + flow);
-                data.push(flow / 2);
+                data.push(100 + flow + bubble);
+                data.push((flow / 2) + bubble / 2);
                 data.push(255);
+            }
+        }
+        data
+    }
+
+    fn generate_portal_frame(&self, frame: i32) -> Vec<u8> {
+        let mut data = Vec::new();
+        let phase = frame as f32 * 0.5;
+        
+        for y in 0..self.default_size {
+            for x in 0..self.default_size {
+                let wave = (((x as f32 * 0.8 + phase).sin() + (y as f32 * 0.6 + phase).cos()) * 50.0) as i32;
+                let swirl = (((x as f32 - 8.0).atan2(y as f32 - 8.0) * 3.0 + phase).sin() * 30.0) as i32;
+                let purple = (128 + wave + swirl).clamp(80, 220) as u8;
+                let magenta = (0 + wave / 3 + swirl / 2).clamp(0, 120) as u8;
+                let violet = (200 + wave + swirl).clamp(150, 255) as u8;
+                
+                data.push(purple);
+                data.push(magenta);
+                data.push(violet);
+                data.push(180);
             }
         }
         data
@@ -311,7 +407,6 @@ impl TextureManager {
         let mut data = Vec::new();
         for y in 0..self.default_size {
             for x in 0..self.default_size {
-                // Patrón de ladrillos
                 let is_mortar = (x % 8 == 0) || (y % 8 == 0);
                 if is_mortar {
                     data.push(20);
@@ -351,6 +446,66 @@ impl TextureManager {
                 data.push(220 + glow);
                 data.push(100 + glow);
                 data.push(255);
+            }
+        }
+        data
+    }
+
+    fn generate_diamond(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        for y in 0..self.default_size {
+            for x in 0..self.default_size {
+                let crystal = ((x + y) % 3) as u8;
+                let sparkle = if (x * 7 + y * 11) % 13 == 0 { 60 } else { 0 };
+                data.push(180 + crystal * 20 + sparkle);
+                data.push(230 + crystal * 8 + sparkle);
+                data.push(255);
+                data.push(255);
+            }
+        }
+        data
+    }
+
+    fn generate_emerald(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        for y in 0..self.default_size {
+            for x in 0..self.default_size {
+                let crystal = ((x + y) % 4) as u8;
+                let sparkle = if (x * 5 + y * 13) % 11 == 0 { 40 } else { 0 };
+                data.push(50 + crystal * 10 + sparkle);
+                data.push(230 + crystal * 6 + sparkle);
+                data.push(80 + crystal * 15 + sparkle);
+                data.push(255);
+            }
+        }
+        data
+    }
+
+    fn generate_obsidian(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        for y in 0..self.default_size {
+            for x in 0..self.default_size {
+                let noise = ((x * 17 + y * 23) % 20) as u8;
+                let purple_tint = if noise > 15 { 20 } else { 0 };
+                data.push(10 + noise / 2);
+                data.push(5 + noise / 4);
+                data.push(25 + purple_tint);
+                data.push(255);
+            }
+        }
+        data
+    }
+
+    fn generate_ice(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        for y in 0..self.default_size {
+            for x in 0..self.default_size {
+                let crack = if (x + y) % 7 == 0 { 30 } else { 0 };
+                let shine = ((x * y) % 5) as u8 * 3;
+                data.push(200 + shine + crack);
+                data.push(230 + shine + crack);
+                data.push(255);
+                data.push(200);
             }
         }
         data
