@@ -122,6 +122,10 @@ impl SceneBuilder {
     fn mark_position(&mut self, x: i32, y: i32, z: i32) {
         self.occupied_positions.insert((x, y, z));
     }
+
+    pub fn remove_block(&mut self, x: i32, y: i32, z: i32) {
+        self.occupied_positions.remove(&(x, y, z));
+    }
     
     pub fn add_cube(mut self, x: f32, y: f32, z: f32, size: f32, material: &str) -> Self {
         let xi = x as i32;
@@ -539,7 +543,7 @@ impl SceneBuilder {
         self = self.add_lava_lake(center_x - 3, bottom_y - 1, center_z - 3, 2);
         self = self.add_lava_lake(center_x + 4, bottom_y - 1, center_z + 4, 3);
         
-        // Pilares de glowstone
+        // ✅ Pilares de glowstone con tamaño 1.0
         let pillar_positions = [
             (center_x - 4, center_z - 4),
             (center_x + 5, center_z + 4),
@@ -549,7 +553,7 @@ impl SceneBuilder {
             for h in 0..3 {
                 let y = bottom_y - h - 3;
                 if !self.is_position_occupied(x, y, z) {
-                    self = self.add_cube(x as f32, y as f32, z as f32, 0.5, "glowstone");
+                    self = self.add_cube(x as f32, y as f32, z as f32, 1.0, "glowstone");
                 }
             }
         }
